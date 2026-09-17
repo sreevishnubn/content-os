@@ -1,9 +1,4 @@
-"""Operational pipeline entrypoint.
-
-The command is intentionally explicit: research -> normalize -> generate ->
-review -> script. Publishing remains a separate command so a human can gate
-production until the channel is proven.
-"""
+"""Operational research -> idea -> script pipeline entrypoint."""
 
 import argparse
 import json
@@ -23,11 +18,8 @@ def main() -> None:
     parser.add_argument("--generate-script", action="store_true")
     args = parser.parse_args()
 
-    provider = RSSResearchProvider()
-    raw = []
-    for url in [item.strip() for item in args.feeds.split(",") if item.strip()]:
-        raw.extend(provider._parse(__import__("httpx").get(url, timeout=20).text, url))
-    research = normalize_items(raw)[: args.limit]
+    feeds = [item.strip() for item in args.feeds.split(",") if item.strip()]
+    research = normalize_items(RSSResearchProvider().fetch(feeds, limit=args.limit))
 
     candidates = []
     for item in research:
