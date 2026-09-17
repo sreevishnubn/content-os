@@ -1,11 +1,9 @@
 """Production HTTP API for the ContentOS operator dashboard."""
 
 import json
-from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -30,6 +28,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Vercel's FastAPI integration supports serving a frontend directory directly
+# from the same application while keeping /api/* as the backend boundary.
+app.frontend("/", directory="dashboard")
 
 
 class YouTubeResearchRequest(BaseModel):
@@ -99,15 +101,6 @@ def _save_ideas(connection, ideas: list[ContentIdea]) -> None:
                  idea.created_at.isoformat()),
             )
     connection.commit()
-
-
-@app.get("/", include_in_schema=False)
-def root():
-    """Serve the operator dashboard at the Vercel project root."""
-    dashboard = Path(__file__).resolve().parents[2] / "dashboard" / "index.html"
-    if not dashboard.exists():
-        raise HTTPException(status_code=500, detail="Dashboard frontend not found")
-    return FileResponse(dashboard, media_type="text/html")
 
 
 @app.get("/health")
