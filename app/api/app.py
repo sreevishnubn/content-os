@@ -17,7 +17,7 @@ from app.research.repository import ResearchRepository
 
 app = FastAPI(title="ContentOS API", version="1.1.0")
 settings = get_settings()
-app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_origin_regex=r"https://([a-zA-Z0-9-]+\.)?github\.io$|https://dashboard\.youtube\.analysis\.com$", allow_credentials=False, allow_methods=["GET", "POST", "PATCH", "OPTIONS"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_origin_regex=r"https://([a-zA-Z0-9-]+\\.)?github\\.io$|https://dashboard\\.youtube\\.analysis\\.com$", allow_credentials=False, allow_methods=["GET", "POST", "PATCH", "OPTIONS"], allow_headers=["*"])
 app.frontend("/", directory="dashboard")
 
 class YouTubeResearchRequest(BaseModel):
@@ -30,11 +30,57 @@ class IdeaStatusUpdate(BaseModel):
     status: IdeaStatus
 
 def _save_ideas(connection, ideas):
-    sql = """INSERT INTO content_ideas(idea_id,title,topic,audience,hook,source,why_now,monetization_angle,demand,curiosity,competition,monetization,production,overall_score,status,metadata_json,created_at) VALUES (:id,:title,:topic,:audience,:hook,:source,:why_now,:monetization,:demand,:curiosity,:competition,:monetization_score,:production,:overall,:status,:metadata,:created)"""
-    for i in ideas:
-        p = {"id":i.idea_id,"title":i.title,"topic":i.topic,"audience":i.audience,"hook":i.hook,"source":i.source,"why_now":i.why_now,"monetization":i.monetization_angle,"demand":i.scores.demand,"curiosity":i.scores.curiosity,"competition":i.scores.competition,"monetization_score":i.scores.monetization,"production":i.scores.production,"overall":i.overall_score,"status":i.status.value,"metadata":json.dumps(i.metadata,sort_keys=True),"created":i.created_at}
-        if using_postgres(): connection.execute(text(sql), p)
-        else: connection.execute(sql.replace(":id","?").replace(":title","?").replace(":topic","?").replace(":audience","?").replace(":hook","?").replace(":source","?").replace(":why_now","?").replace(":monetization","?").replace(":demand","?").replace(":curiosity","?").replace(":competition","?").replace(":monetization_score","?").replace(":production","?").replace(":overall","?").replace(":status","?").replace(":metadata","?").replace(":created","?"), tuple(p.values()))
+    columns = """idea_id,title,topic,audience,hook,source,why_now,monetization_angle,
+        demand,curiosity,competition,monetization,production,overall_score,status,
+        metadata_json,created_at"""
+    if using_postgres():
+        sql = f"""INSERT INTO content_ideas ({columns})
+            VALUES (:id,:title,:topic,:audience,:hook,:source,:why_now,:monetization,
+                    :demand,:curiosity,:competition,:monetization_score,:production,
+                    :overall,:status,:metadata,:created)"""
+        for i in ideas:
+            connection.execute(text(sql), {
+                "id": i.idea_id,
+                "title": i.title,
+                "topic": i.topic,
+                "audience": i.audience,
+                "hook": i.hook,
+                "source": i.source,
+                "why_now": i.why_now,
+                "monetization": i.monetization_angle,
+                "demand": i.scores.demand,
+                "curiosity": i.scores.curiosity,
+                "competition": i.scores.competition,
+                "monetization_score": i.scores.monetization,
+                "production": i.scores.production,
+                "overall": i.overall_score,
+                "status": i.status.value,
+                "metadata": json.dumps(i.metadata, sort_keys=True),
+                "created": i.created_at,
+            })
+    else:
+        sql = f"""INSERT INTO content_ideas ({columns.replace(chr(10), ' ')})
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+        for i in ideas:
+            connection.execute(sql, (
+                i.idea_id,
+                i.title,
+                i.topic,
+                i.audience,
+                i.hook,
+                i.source,
+                i.why_now,
+                i.monetization_angle,
+                i.scores.demand,
+                i.scores.curiosity,
+                i.scores.competition,
+                i.scores.monetization,
+                i.scores.production,
+                i.overall_score,
+                i.status.value,
+                json.dumps(i.metadata, sort_keys=True),
+                i.created_at,
+            ))
     connection.commit()
 
 def _idea_from_row(row):
