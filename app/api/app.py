@@ -16,6 +16,7 @@ from app.ideas.scorer import score_idea
 from app.research.engine import normalize_items
 from app.research.models import ResearchItem
 from app.research.providers.youtube_rss import YouTubeRSSProvider
+from app.research.providers.youtube_resolver import resolve_channel_ids
 from app.research.repository import ResearchRepository
 
 app = FastAPI(title="ContentOS API", version="1.0.0")
@@ -35,6 +36,8 @@ app.frontend("/", directory="dashboard")
 
 
 class YouTubeResearchRequest(BaseModel):
+    # Backwards-compatible field name: values may now be channel IDs, @handles,
+    # or public YouTube channel URLs. ContentOS resolves them before RSS research.
     channel_ids: list[str] = Field(min_length=1, max_length=20)
     query: str = ""
     limit: int = Field(default=20, ge=1, le=100)
@@ -129,10 +132,34 @@ def health() -> dict[str, object]:
             connection.close()
 
 
+@app.post("/api/research/youtube/resolve")
+def resolve_youtube_channels(request: YouTubeResearchRequest) -> dict[str, object]:
+    """Resolve IDs, @handles, and public channel URLs before research."""
+    resolved: list[dict[str, str]] = []
+    for source in request.channel_ids:
+        try:
+            channel_id = resolve_channel_ids([source])[0]
+            resolved.append({"input": source, "channel_id": channel_id})
+        except Exception as exc:
+            resolved.append({"input": source, "error": f"{type(exc).__name__}: {exc}"})
+    return {
+        "resolved": [item for item in resolved if "channel_id" in item],
+        "failed": [item for item in resolved if "error" in item],
+    }
+
+
 @app.post("/api/research/youtube", dependencies=[Depends(require_api_token)])
 def research_youtube(request: YouTubeResearchRequest) -> dict[str, object]:
-    """Fetch public YouTube uploads, persist evidence, and optionally create ideas."""
-    provider = YouTubeRSSProvider(request.channel_ids)
+    """Resolve public channel sources, fetch uploads, persist evidence, and create ideas."""
+    try:
+        resolved_ids = resolve_channel_ids(request.channel_ids)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not resolve one or more YouTube channels: {type(exc).__name__}: {exc}",
+        ) from exc
+
+    provider = YouTubeRSSProvider(resolved_ids)
     try:
         items = normalize_items(provider.search(request.query, limit=request.limit))
     except Exception as exc:
@@ -148,6 +175,7 @@ def research_youtube(request: YouTubeResearchRequest) -> dict[str, object]:
             _save_ideas(connection, ideas)
         return {
             "provider": provider.name,
+            "channel_ids": resolved_ids,
             "research_items_found": len(items),
             "ideas_created": len(ideas),
             "research": [item.model_dump(mode="json") for item in items],
