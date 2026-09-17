@@ -18,6 +18,11 @@ def test_dashboard_overview_shape():
         "research_items",
         "ideas",
         "approved",
-        "published",
         "review",
+        "scripts",
+        "production",
+        "published",
+        "analytics",
+        "learning",
+        "automation",
     }
