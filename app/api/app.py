@@ -26,7 +26,10 @@ def require_api_token(authorization: str | None = Header(default=None)) -> None:
         raise HTTPException(status_code=401, detail="Invalid or missing API token")
 
 
-def _prepare(connection) -> None:
+def _prepare(connection, *, bootstrap: bool = False) -> None:
+    """Prepare a local DB automatically; require explicit bootstrap for Postgres."""
+    if not bootstrap and using_postgres():
+        return
     if using_postgres():
         initialize_postgres_schema(connection)
     else:
@@ -41,7 +44,6 @@ def _fetch_one(connection, sql: str):
 
 @app.get("/")
 def root() -> dict[str, str]:
-    """Return a small deployment status document instead of a 404 at the root."""
     return {"service": "ContentOS API", "status": "online", "health": "/health"}
 
 
@@ -55,9 +57,16 @@ def health() -> dict[str, object]:
         else:
             _prepare(connection)
             connection.execute("SELECT 1")
-        return {"status": "ok", "service": "contentos-api", "database": "postgres" if using_postgres() else "sqlite"}
+        return {
+            "status": "ok",
+            "service": "contentos-api",
+            "database": "postgres" if using_postgres() else "sqlite",
+        }
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Database health check failed: {type(exc).__name__}") from exc
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database health check failed: {type(exc).__name__}",
+        ) from exc
     finally:
         connection.close()
 
@@ -108,10 +117,10 @@ def dashboard_ideas(limit: int = 20) -> list[dict[str, object]]:
 
 @app.post("/api/admin/bootstrap", dependencies=[Depends(require_api_token)])
 def bootstrap_database() -> dict[str, str]:
-    """Initialize the configured database schema."""
+    """Explicitly initialize the configured production database schema."""
     connection = get_connection()
     try:
-        _prepare(connection)
+        _prepare(connection, bootstrap=True)
         return {"status": "initialized"}
     finally:
         connection.close()
