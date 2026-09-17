@@ -1,11 +1,12 @@
 """Niche-independent content idea generation boundary.
 
 V0 keeps generation provider-agnostic: callers can pass ideas produced by an
-LLM, a research adapter, or a human. This prevents the business logic from
-being coupled to one AI provider.
+LLM, a research adapter, or a human. This prevents business logic from being
+coupled to one AI provider.
 """
 
 from collections.abc import Iterable
+from typing import Any
 
 from app.database.models import ContentIdea, IdeaScores
 
@@ -24,8 +25,9 @@ def build_idea(
     competition: float = 0,
     monetization: float = 0,
     production: float = 0,
+    metadata: dict[str, Any] | None = None,
 ) -> ContentIdea:
-    """Create a validated content idea from structured generation output."""
+    """Create one validated content idea from structured generation output."""
     return ContentIdea(
         title=title.strip(),
         topic=topic.strip(),
@@ -41,6 +43,7 @@ def build_idea(
             monetization=monetization,
             production=production,
         ),
+        metadata=metadata or {},
     )
 
 
