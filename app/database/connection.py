@@ -1,8 +1,4 @@
-"""Database connection boundary.
-
-SQLite remains the local development default. Production uses PostgreSQL via
-DATABASE_URL, keeping the rest of the application independent of the driver.
-"""
+"""Database connection boundary for ContentOS."""
 
 import sqlite3
 from pathlib import Path
@@ -11,6 +7,7 @@ from app.config.settings import get_settings
 
 
 def get_connection():
+    """Return a local SQLite connection or a PostgreSQL SQLAlchemy connection."""
     settings = get_settings()
     if settings.database_url:
         from sqlalchemy import create_engine
@@ -21,3 +18,7 @@ def get_connection():
     connection = sqlite3.connect(path)
     connection.row_factory = sqlite3.Row
     return connection
+
+
+def using_postgres() -> bool:
+    return bool(get_settings().database_url)
