@@ -1,8 +1,4 @@
-"""RSS/Atom research provider.
-
-RSS is intentionally the first production research adapter because it is
-simple, auditable and does not require a provider-specific search API key.
-"""
+"""RSS/Atom research provider."""
 
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -16,25 +12,18 @@ from app.research.models import ResearchItem
 class RSSResearchProvider:
     name = "rss"
 
-    def search(self, query: str, *, limit: int = 20) -> list[ResearchItem]:
-        """Search a configured feed URL or feed list.
-
-        `query` is interpreted as a comma-separated list of RSS/Atom URLs.
-        ContentOS filters matching entries locally by title/summary.
-        """
-        feeds = [item.strip() for item in query.split(",") if item.strip()]
+    def fetch(self, feed_urls: list[str], *, limit: int = 20) -> list[ResearchItem]:
         results: list[ResearchItem] = []
-        for feed_url in feeds:
+        for feed_url in feed_urls:
             response = httpx.get(feed_url, timeout=20, follow_redirects=True)
             response.raise_for_status()
             results.extend(self._parse(response.text, feed_url))
-        terms = [term.lower() for term in query.split() if "://" not in term]
-        if terms:
-            results = [
-                item for item in results
-                if any(term in f"{item.title} {item.summary}".lower() for term in terms)
-            ]
         return results[:limit]
+
+    def search(self, query: str, *, limit: int = 20) -> list[ResearchItem]:
+        """Treat query as comma-separated feed URLs for the V1 RSS provider."""
+        feeds = [item.strip() for item in query.split(",") if item.strip()]
+        return self.fetch(feeds, limit=limit)
 
     @staticmethod
     def _parse(xml_text: str, feed_url: str) -> list[ResearchItem]:
@@ -49,7 +38,7 @@ class RSSResearchProvider:
             }
             title = values.get("title", "").strip()
             summary = values.get("description") or values.get("summary") or values.get("content") or title
-            link = values.get("link")
+            link = values.get("link") or feed_url
             published = values.get("pubDate") or values.get("published") or values.get("updated")
             published_at = None
             if published:
@@ -64,7 +53,7 @@ class RSSResearchProvider:
                 ResearchItem(
                     title=title or "Untitled research item",
                     summary=summary[:10000],
-                    url=link or feed_url,
+                    url=link,
                     source_name=feed_url,
                     published_at=published_at,
                     discovered_at=datetime.now(timezone.utc),
