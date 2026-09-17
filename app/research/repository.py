@@ -25,7 +25,7 @@ class ResearchRepository:
                         """INSERT INTO research_items
                         (research_id,title,summary,url,source_name,published_at,discovered_at,tags_json)
                         VALUES (:id,:title,:summary,:url,:source,:published,:discovered,:tags)
-                        ON CONFLICT (url) DO NOTHING"""
+                        ON CONFLICT DO NOTHING"""
                     ),
                     {
                         "id": str(uuid.uuid4()),
