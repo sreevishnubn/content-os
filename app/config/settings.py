@@ -2,23 +2,25 @@ import os
 from functools import lru_cache
 
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 load_dotenv()
 
 
 class Settings(BaseModel):
-    """Runtime configuration; secrets are read only from environment variables."""
+    """Central runtime configuration for local and hosted ContentOS."""
 
     app_name: str = "ContentOS"
     environment: str = "development"
+    database_url: str | None = None
     database_path: str = "data/content.db"
+    api_token: str | None = None
+    cors_origins: list[str] = Field(default_factory=list)
     llm_provider: str | None = None
     llm_model: str | None = None
 
     @property
     def llm_api_key(self) -> str | None:
-        """Resolve the configured provider's key without persisting it."""
         keys = {
             "openai": os.getenv("OPENAI_API_KEY"),
             "anthropic": os.getenv("ANTHROPIC_API_KEY"),
@@ -26,12 +28,23 @@ class Settings(BaseModel):
         }
         return keys.get(self.llm_provider or "")
 
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() == "production"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    origins = os.getenv(
+        "CONTENTOS_CORS_ORIGINS",
+        "https://sreevishnubn.github.io,https://dashboard.youtube.analysis.com,http://localhost:5500,http://localhost:8000",
+    )
     return Settings(
         environment=os.getenv("CONTENTOS_ENVIRONMENT", "development"),
+        database_url=os.getenv("DATABASE_URL") or None,
         database_path=os.getenv("CONTENTOS_DATABASE_PATH", "data/content.db"),
+        api_token=os.getenv("CONTENTOS_API_TOKEN") or None,
+        cors_origins=[item.strip() for item in origins.split(",") if item.strip()],
         llm_provider=os.getenv("CONTENTOS_LLM_PROVIDER") or None,
         llm_model=os.getenv("CONTENTOS_LLM_MODEL") or None,
     )
