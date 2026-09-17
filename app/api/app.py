@@ -27,9 +27,7 @@ def require_api_token(authorization: str | None = Header(default=None)) -> None:
 
 
 def _prepare(connection, *, bootstrap: bool = False) -> None:
-    """Prepare a local DB automatically; require explicit bootstrap for Postgres."""
-    if not bootstrap and using_postgres():
-        return
+    """Ensure the configured database has the ContentOS tables."""
     if using_postgres():
         initialize_postgres_schema(connection)
     else:
@@ -119,7 +117,7 @@ def dashboard_ideas(limit: int = 20) -> list[dict[str, object]]:
 
 @app.post("/api/admin/bootstrap", dependencies=[Depends(require_api_token)])
 def bootstrap_database() -> dict[str, str]:
-    """Explicitly initialize the configured production database schema."""
+    """Explicitly initialize the configured database schema."""
     connection = get_connection()
     try:
         _prepare(connection, bootstrap=True)
