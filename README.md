@@ -19,14 +19,25 @@ The long-term advantage is the feedback loop: real channel performance should im
 - AI recommends; a human approves.
 - Store decisions and outcomes as data.
 - Keep business logic portable so infrastructure can evolve later.
+- Research adapters provide evidence; the Research Engine does not invent facts.
 
 ## V0 stack
 
 - Python
 - SQLite
 - Pydantic
-- LLM integration boundary (provider-agnostic)
+- Provider-agnostic research and LLM boundaries
 - Pytest
+
+## Current pipeline
+
+1. **Research Engine** accepts normalized research items from any source adapter.
+2. It normalizes text and URLs and removes duplicate items.
+3. **Idea Engine** turns structured opportunities into `ContentIdea` objects.
+4. **Scorer** produces a transparent opportunity score.
+5. Human review remains the approval gate.
+
+V0 intentionally does not call external APIs directly. This lets us validate the data model and business rules before choosing providers.
 
 ## Planned evolution
 
