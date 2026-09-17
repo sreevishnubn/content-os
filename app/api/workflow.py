@@ -61,7 +61,9 @@ def create_script(request:ScriptDraftRequest):
             settings=get_settings()
             if not settings.llm_provider:
                 raise RuntimeError("LLM provider is not configured")
-            generated=ScriptGenerator(get_llm_provider()).generate(idea=idea,evidence=evidence)
+            generated=ScriptGenerator(get_llm_provider()).generate(idea=idea,evidence=evidence,version=version)
+        except HTTPException:
+            raise
         except Exception as exc:
             raise HTTPException(502,f"Script generation failed: {type(exc).__name__}: {exc}") from exc
         now=datetime.now(timezone.utc).isoformat(); sid=str(uuid4())
