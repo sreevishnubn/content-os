@@ -43,7 +43,7 @@ def _set_status(c, table, key, keycol, status, allowed):
     current = _require(c, f"SELECT status FROM {table} WHERE {keycol}=:id", {"id": key}, f"{table} record not found")
     current_status = current["status"]
     if status == current_status: return current_status
-    transitions = {"DRAFT":{"SCHEDULED","FAILED"},"SCHEDULED":{"PUBLISHED","FAILED","DRAFT"},"PUBLISHED":set(),"FAILED":{"DRAFT"},"QUEUED":{"ASSETS","FAILED"},"ASSETS":{"RENDERING","FAILED"},"RENDERING":{"READY","FAILED"},"READY":set(),"RUNNING":{"SUCCEEDED","FAILED"},"SUCCEEDED":set()}
+    transitions = {"DRAFT":{"SCHEDULED","FAILED"},"SCHEDULED":{"PUBLISHED","FAILED","DRAFT"},"PUBLISHED":set(),"FAILED":{"DRAFT","QUEUED"},"QUEUED":{"ASSETS","FAILED"},"ASSETS":{"RENDERING","FAILED"},"RENDERING":{"READY","FAILED"},"READY":set(),"RUNNING":{"SUCCEEDED","FAILED"},"SUCCEEDED":set()}
     if status not in transitions.get(current_status, set()): raise HTTPException(409, f"Invalid transition: {current_status} -> {status}")
     _insert(c, f"UPDATE {table} SET status=:status WHERE {keycol}=:id", {"status": status, "id": key})
     return status
@@ -108,11 +108,9 @@ def production_status(production_id: str, request: StatusRequest):
     c=get_connection()
     try:
         prepare_database(c)
-        if request.status == "READY":
-            job=_require(c,"SELECT status,output_path FROM production_jobs WHERE production_id=:id",{"id":production_id},"production_jobs record not found")
-            if job["status"] != "RENDERING":
-                _set_status(c,"production_jobs",production_id,"production_id","READY",{"QUEUED","ASSETS","RENDERING","READY","FAILED"})
-            if not job["output_path"]: raise HTTPException(409,"Production cannot become READY until an artifact is registered")
+        job=_require(c,"SELECT status,output_path FROM production_jobs WHERE production_id=:id",{"id":production_id},"production_jobs record not found")
+        if request.status == "READY" and not job["output_path"]:
+            raise HTTPException(409,"Production cannot become READY until an artifact is registered")
         status=_set_status(c,"production_jobs",production_id,"production_id",request.status,{"QUEUED","ASSETS","RENDERING","READY","FAILED"})
         return {"production_id":production_id,"status":status}
     finally: c.close()
