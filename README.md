@@ -2,67 +2,175 @@
 
 ContentOS is the internal content operating system for Business #1: a faceless, AI-assisted media business.
 
-## V0.1 objective
+The product is designed around a measurable feedback loop rather than a simple AI content generator:
 
-Turn research into structured, reviewable and persisted content opportunities. V0.1 deliberately stops before automatic publishing so we can validate the content strategy and human decision workflow before scaling the machinery.
+`Research → Ideas → Scoring → Human Review → Script → Production → Publish → Analytics → Learning → Ideas`
 
-## Core loop
+## What exists now
 
-`Research → Ideas → Scoring → Persistence → Human Review → Script → Production → Publish → Analytics → Learning → Ideas`
+The repository contains the software foundation for:
 
-The long-term advantage is the feedback loop: real channel performance should improve future content selection instead of treating every video as an isolated generation task.
+- research normalization
+- provider-independent LLM contracts
+- idea generation and transparent scoring
+- human review workflow contracts
+- script/production/publishing models
+- analytics and learning models
+- automation jobs
+- SQLite local development
+- PostgreSQL production persistence boundary
+- FastAPI API
+- live dashboard API integration
+- GitHub Actions tests
+- GitHub Pages dashboard
+- Vercel deployment configuration
+- production database migration
 
-## V0.1 principles
+The dashboard is intentionally no longer allowed to pretend that demo numbers are live. If the API is unavailable, it shows an API-offline state.
 
-- Business first, software second.
-- Keep the content model niche-independent.
-- AI recommends; a human approves.
-- Store decisions and outcomes as data.
-- Research adapters provide evidence; the Research Engine does not invent facts.
-- Keep business logic portable so infrastructure can evolve later.
-- Do not fabricate intelligence: V0.1 scoring inputs remain explicit until a scoring provider is added.
+## Quick start
 
-## Current pipeline
+### 1. Clone
 
-1. **Research Engine** accepts normalized research items from any source adapter.
-2. It normalizes text and URLs and removes duplicate items.
-3. **Idea Engine** converts each research item into deterministic editorial candidates.
-4. **Scorer** calculates a transparent weighted opportunity score.
-5. **Idea Repository** persists candidates and their evidence in SQLite.
-6. **Human Review Service** moves ideas through `DISCOVERED → SHORTLISTED → APPROVED` or `REJECTED` using explicit workflow rules.
+```bash
+git clone https://github.com/sreevishnubn/content-os.git
+cd content-os
+```
 
-Research-derived V0.1 candidates use neutral zero-valued scoring inputs until a real scoring/intelligence provider is introduced. This keeps the system honest and provider-agnostic.
+### 2. Create a Python environment
 
-## V0.1 tested path
+```bash
+python -m venv .venv
+```
 
-`Research → Normalize/Dedupe → Generate 3 Angles → Score → SQLite → Retrieve → Human Review`
+Activate it using your operating system's normal virtual-environment command.
 
-The test suite covers normalization, duplicate removal, idea generation, scoring, persistence round-trips, status filtering, valid review transitions, invalid transitions, and the complete integration path.
+### 3. Install
 
-## Current boundaries
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
-V0.1 intentionally does not call external APIs directly and does not implement automatic publishing, script generation, production, analytics, or learning. Those are downstream stages and will be added only after the idea-management foundation is validated.
+### 4. Configure
 
-## V0.1 stack
+Copy `.env.example` to `.env`.
 
-- Python
-- SQLite
-- Pydantic
-- Provider-agnostic research and LLM boundaries
-- Pytest
+For local development leave `DATABASE_URL` empty. ContentOS then uses SQLite at `data/content.db`.
 
-## Planned evolution
+### 5. Test
 
-V0.1 starts locally and can later move toward:
+```bash
+python -m pytest -q
+```
 
-`SQLite → PostgreSQL`
+### 6. Start the API
 
-`Local workers → Redis/Celery`
+```bash
+python -m uvicorn app.api.app:app --reload --port 8000
+```
 
-`Local storage → S3`
+Open:
 
-`Python CLI → FastAPI`
+- API: `http://localhost:8000`
+- Health: `http://localhost:8000/health`
+- Swagger: `http://localhost:8000/docs`
 
-`Local runtime → AWS`
+## Production architecture
 
-The domain models and business logic should remain stable during that migration.
+```text
+GitHub
+  │
+  ├── CI/tests
+  └── source
+       │
+       ├──────────────→ GitHub Pages → Dashboard
+       │                              │
+       │                              │ HTTPS
+       │                              ▼
+       └──────────────→ Vercel → FastAPI API
+                                      │
+                                      ▼
+                                PostgreSQL
+```
+
+SQLite is for local development. Production persistence must use a hosted PostgreSQL database through `DATABASE_URL`.
+
+## Production database
+
+Set:
+
+```text
+DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:5432/DATABASE
+```
+
+Then apply the migration:
+
+```bash
+python scripts/migrate.py
+```
+
+Never commit database credentials.
+
+## Production environment variables
+
+At minimum:
+
+```text
+CONTENTOS_ENVIRONMENT=production
+DATABASE_URL=<managed-postgresql-url>
+CONTENTOS_API_TOKEN=<long-random-secret>
+CONTENTOS_CORS_ORIGINS=https://sreevishnubn.github.io,https://dashboard.youtube.analysis.com
+```
+
+LLM and YouTube credentials should be added only when their integrations are enabled and must remain server-side.
+
+## API
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/health` | Service/database health |
+| GET | `/api/dashboard/overview` | Live workflow counts |
+| GET | `/api/dashboard/ideas` | Ranked ideas |
+| POST | `/api/admin/bootstrap` | Initialize configured database |
+
+## Documentation
+
+The complete product, architecture, local setup, production deployment, database, security, dashboard, API, automation, troubleshooting, backup, observability and roadmap guide is here:
+
+**[docs/CONTENTOS_COMPLETE_GUIDE.md](docs/CONTENTOS_COMPLETE_GUIDE.md)**
+
+Read that document before deploying production.
+
+## Important boundary
+
+The software foundation is production-oriented, but the complete business automation is not claimed to be finished until real external integrations are configured and tested:
+
+```text
+Research provider
+      ↓
+LLM provider
+      ↓
+Script generation
+      ↓
+Production/rendering provider
+      ↓
+YouTube OAuth/publishing
+      ↓
+YouTube Analytics
+      ↓
+Learning loop
+```
+
+This distinction prevents demo data, missing credentials, or unimplemented providers from being mistaken for a working production business system.
+
+## Engineering principles
+
+1. Business first, software second.
+2. AI recommends; a human approves important decisions.
+3. Store decisions and outcomes as data.
+4. Keep provider integrations behind interfaces.
+5. Keep data traceable from published output back to research evidence.
+6. Never fabricate live data.
+7. Measure before changing the scoring system.
+8. Add infrastructure only when the business needs it.
