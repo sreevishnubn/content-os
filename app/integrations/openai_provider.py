@@ -30,31 +30,37 @@ class OpenAIProvider(LLMProvider):
             if getattr(usage, key, None) is not None
         }
 
+    @staticmethod
+    def _request_kwargs(request: LLMRequest, model: str) -> dict:
+        kwargs = {
+            "model": model,
+            "instructions": request.system_prompt or None,
+            "input": request.user_prompt,
+            "max_output_tokens": request.max_tokens,
+        }
+        # GPT-5/reasoning models use their default sampling behavior and do not
+        # accept the legacy temperature control.
+        if not model.startswith("gpt-5"):
+            kwargs["temperature"] = request.temperature
+        return kwargs
+
     def generate(self, request: LLMRequest) -> LLMResponse:
-        response = self.client.responses.create(
-            model=request.model or self.default_model,
-            instructions=request.system_prompt or None,
-            input=request.user_prompt,
-            temperature=request.temperature,
-            max_output_tokens=request.max_tokens,
-        )
+        model = request.model or self.default_model
+        response = self.client.responses.create(**self._request_kwargs(request, model))
         return LLMResponse(
             text=response.output_text,
             provider=self.name,
-            model=request.model or self.default_model,
+            model=model,
             usage=self._usage(response),
         )
 
     def generate_structured(
         self, request: LLMRequest, response_model: type[T]
     ) -> StructuredLLMResponse[T]:
+        model = request.model or self.default_model
         response = self.client.responses.parse(
-            model=request.model or self.default_model,
-            instructions=request.system_prompt or None,
-            input=request.user_prompt,
+            **self._request_kwargs(request, model),
             text_format=response_model,
-            temperature=request.temperature,
-            max_output_tokens=request.max_tokens,
         )
         parsed = response.output_parsed
         if parsed is None:
@@ -62,6 +68,6 @@ class OpenAIProvider(LLMProvider):
         return StructuredLLMResponse(
             data=parsed,
             provider=self.name,
-            model=request.model or self.default_model,
+            model=model,
             usage=self._usage(response),
         )
