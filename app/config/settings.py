@@ -17,7 +17,7 @@ class Settings(BaseModel):
     api_token: str | None = None
     cors_origins: list[str] = Field(default_factory=list)
     llm_provider: str | None = "openrouter"
-    llm_model: str | None = "openai/gpt-oss-20b"
+    llm_model: str | None = "openrouter/free"
 
     @property
     def llm_api_key(self) -> str | None:
@@ -70,5 +70,5 @@ def get_settings() -> Settings:
         api_token=os.getenv("CONTENTOS_API_TOKEN") or None,
         cors_origins=[item.strip() for item in origins.split(",") if item.strip()],
         llm_provider=os.getenv("CONTENTOS_LLM_PROVIDER") or "openrouter",
-        llm_model=os.getenv("CONTENTOS_LLM_MODEL") or "openai/gpt-oss-20b",
+        llm_model=os.getenv("CONTENTOS_LLM_MODEL") or "openrouter/free",
     )
