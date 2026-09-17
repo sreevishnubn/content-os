@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from app.llm.models import LLMRequest
-from app.llm.providers.openai import OpenAIProvider
+from app.integrations.openai_provider import OpenAIProvider
 
 
 def test_openai_provider_normalizes_response(monkeypatch):
@@ -9,7 +9,7 @@ def test_openai_provider_normalizes_response(monkeypatch):
         def create(self, **kwargs):
             assert kwargs["model"] == "gpt-test"
             assert kwargs["input"] == "hello"
-            assert kwargs["store"] is False
+            assert kwargs["instructions"] == ""
             return SimpleNamespace(
                 id="resp_123",
                 model="gpt-test",
@@ -22,7 +22,7 @@ def test_openai_provider_normalizes_response(monkeypatch):
             assert kwargs["api_key"] == "test-key"
             self.responses = FakeResponses()
 
-    monkeypatch.setattr("app.llm.providers.openai.OpenAI", FakeClient)
+    monkeypatch.setattr("app.integrations.openai_provider.OpenAI", FakeClient)
     provider = OpenAIProvider(api_key="test-key", default_model="gpt-test")
     response = provider.generate(LLMRequest(user_prompt="hello"))
 
