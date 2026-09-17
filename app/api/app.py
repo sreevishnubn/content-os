@@ -53,7 +53,7 @@ def health():
     finally:
         if c: c.close()
 
-@app.post("/api/research/youtube/resolve")
+@app.post("/api/research/youtube/resolve", dependencies=[Depends(require_api_token)])
 def resolve_youtube_channels(request:YouTubeResearchRequest):
     resolved=[]; failed=[]
     for source in request.channel_ids:
