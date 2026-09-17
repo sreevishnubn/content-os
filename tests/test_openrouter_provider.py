@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 
-from app.llm.models import LLMRequest
+from pydantic import BaseModel
+
 from app.integrations.openrouter_provider import OpenRouterProvider
+from app.llm.models import LLMRequest
 
 
 def test_openrouter_provider_normalizes_response(monkeypatch):
@@ -54,8 +56,6 @@ def test_openrouter_structured_output(monkeypatch):
     class FakeClient:
         def __init__(self, **kwargs):
             self.chat = FakeChat()
-
-    from pydantic import BaseModel
 
     monkeypatch.setattr("app.integrations.openrouter_provider.OpenAI", FakeClient)
     provider = OpenRouterProvider(api_key="test-key", default_model="test/model")
