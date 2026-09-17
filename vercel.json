@@ -4,9 +4,5 @@
     "api/index.py": {
       "maxDuration": 30
     }
-  },
-  "rewrites": [
-    { "source": "/", "destination": "/dashboard/index.html" },
-    { "source": "/dashboard", "destination": "/dashboard/index.html" }
-  ]
+  }
 }
