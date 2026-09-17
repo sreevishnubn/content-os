@@ -10,12 +10,18 @@ The product is designed around a measurable feedback loop rather than a simple A
 
 The repository contains the software foundation for:
 
-- research normalization
+- real RSS/Atom research ingestion
 - provider-independent LLM contracts
+- OpenAI structured generation adapter
 - idea generation and transparent scoring
 - human review workflow contracts
-- script/production/publishing models
-- analytics and learning models
+- real script generation service
+- OpenAI text-to-speech adapter
+- FFmpeg video renderer
+- YouTube OAuth helper
+- YouTube resumable upload adapter
+- YouTube Analytics adapter
+- analytics/learning models
 - automation jobs
 - SQLite local development
 - PostgreSQL production persistence boundary
@@ -76,6 +82,10 @@ Open:
 - Health: `http://localhost:8000/health`
 - Swagger: `http://localhost:8000/docs`
 
+## Real integrations
+
+Read **[docs/REAL_INTEGRATIONS_GUIDE.md](docs/REAL_INTEGRATIONS_GUIDE.md)** for the complete setup of research, OpenAI, TTS, FFmpeg, YouTube OAuth, publishing, analytics and learning.
+
 ## Production architecture
 
 ```text
@@ -92,9 +102,16 @@ GitHub
                                       │
                                       ▼
                                 PostgreSQL
+
+Worker/compute
+  ├── research ingestion
+  ├── TTS
+  ├── FFmpeg rendering
+  ├── YouTube publishing
+  └── analytics ingestion
 ```
 
-SQLite is for local development. Production persistence must use a hosted PostgreSQL database through `DATABASE_URL`.
+SQLite is for local development. Production persistence must use a hosted PostgreSQL database through `DATABASE_URL`. Video rendering should run on worker/compute infrastructure rather than inside a Vercel request.
 
 ## Production database
 
@@ -121,9 +138,16 @@ CONTENTOS_ENVIRONMENT=production
 DATABASE_URL=<managed-postgresql-url>
 CONTENTOS_API_TOKEN=<long-random-secret>
 CONTENTOS_CORS_ORIGINS=https://sreevishnubn.github.io,https://dashboard.youtube.analysis.com
+CONTENTOS_LLM_PROVIDER=openai
+CONTENTOS_LLM_MODEL=gpt-5-mini
+OPENAI_API_KEY=<secret>
+CONTENTOS_RESEARCH_FEEDS=<comma-separated-feeds>
+CONTENTOS_TTS_PROVIDER=openai
+CONTENTOS_TTS_MODEL=gpt-4o-mini-tts
+CONTENTOS_TTS_VOICE=alloy
 ```
 
-LLM and YouTube credentials should be added only when their integrations are enabled and must remain server-side.
+YouTube OAuth credentials must remain server-side/private. See the integration guide.
 
 ## API
 
@@ -134,35 +158,22 @@ LLM and YouTube credentials should be added only when their integrations are ena
 | GET | `/api/dashboard/ideas` | Ranked ideas |
 | POST | `/api/admin/bootstrap` | Initialize configured database |
 
+## Production gate
+
+The recommended publication state machine is:
+
+`DISCOVERED → SHORTLISTED → APPROVED → SCRIPTING → PRODUCTION → REVIEW → READY_TO_PUBLISH → SCHEDULED → PUBLISHED`
+
+Only `READY_TO_PUBLISH` content should be eligible for automatic publishing.
+
 ## Documentation
 
-The complete product, architecture, local setup, production deployment, database, security, dashboard, API, automation, troubleshooting, backup, observability and roadmap guide is here:
-
-**[docs/CONTENTOS_COMPLETE_GUIDE.md](docs/CONTENTOS_COMPLETE_GUIDE.md)**
-
-Read that document before deploying production.
+- **[Complete Product Guide](docs/CONTENTOS_COMPLETE_GUIDE.md)** — architecture, local setup, production operations and troubleshooting.
+- **[Real Integrations Guide](docs/REAL_INTEGRATIONS_GUIDE.md)** — research, LLM, script, TTS, rendering, YouTube OAuth, publishing, analytics and learning.
 
 ## Important boundary
 
-The software foundation is production-oriented, but the complete business automation is not claimed to be finished until real external integrations are configured and tested:
-
-```text
-Research provider
-      ↓
-LLM provider
-      ↓
-Script generation
-      ↓
-Production/rendering provider
-      ↓
-YouTube OAuth/publishing
-      ↓
-YouTube Analytics
-      ↓
-Learning loop
-```
-
-This distinction prevents demo data, missing credentials, or unimplemented providers from being mistaken for a working production business system.
+The integration code is real, but external accounts and credentials still have to be configured by the operator. The application cannot safely invent an OpenAI API key, Google OAuth client, YouTube authorization, PostgreSQL database, or research-feed configuration.
 
 ## Engineering principles
 
