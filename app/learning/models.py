@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -10,4 +10,4 @@ class LearningSignal(BaseModel):
     signal_type: str
     observation: str
     confidence: float = Field(default=0.5, ge=0, le=1)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
