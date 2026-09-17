@@ -20,28 +20,27 @@ app.add_middleware(
 
 
 def require_api_token(authorization: str | None = Header(default=None)) -> None:
-    """Protect mutating/admin endpoints when a production token is configured."""
     if not settings.api_token:
         return
-    expected = f"Bearer {settings.api_token}"
-    if authorization != expected:
+    if authorization != f"Bearer {settings.api_token}":
         raise HTTPException(status_code=401, detail="Invalid or missing API token")
 
 
-def _overview_sql() -> str:
-    return """
-        SELECT
-            COUNT(*) AS ideas,
-            SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END) AS approved,
-            SUM(CASE WHEN status = 'PUBLISHED' THEN 1 ELSE 0 END) AS published,
-            SUM(CASE WHEN status IN ('SHORTLISTED', 'REVIEW') THEN 1 ELSE 0 END) AS review
-        FROM content_ideas
-    """
+def _prepare(connection) -> None:
+    if using_postgres():
+        initialize_postgres_schema(connection)
+    else:
+        initialize_schema(connection)
+
+
+def _fetch_one(connection, sql: str):
+    if using_postgres():
+        return connection.execute(text(sql)).mappings().one()
+    return connection.execute(sql).fetchone()
 
 
 @app.get("/health")
 def health() -> dict[str, object]:
-    """Liveness/readiness endpoint."""
     connection = get_connection()
     try:
         if using_postgres():
@@ -55,28 +54,27 @@ def health() -> dict[str, object]:
 
 @app.get("/api/dashboard/overview")
 def dashboard_overview() -> dict[str, object]:
-    """Return live workflow counts from the configured database."""
+    """Return live counts across the complete content lifecycle."""
     connection = get_connection()
     try:
-        if using_postgres():
-            initialize_postgres_schema(connection)
-            row = connection.execute(text(_overview_sql())).mappings().one()
-            return {
-                "research_items": 0,
-                "ideas": row["ideas"] or 0,
-                "approved": row["approved"] or 0,
-                "published": row["published"] or 0,
-                "review": row["review"] or 0,
-            }
-        initialize_schema(connection)
-        row = connection.execute(_overview_sql()).fetchone()
-        return {
-            "research_items": 0,
-            "ideas": row["ideas"] or 0,
-            "approved": row["approved"] or 0,
-            "published": row["published"] or 0,
-            "review": row["review"] or 0,
-        }
+        _prepare(connection)
+        counts = _fetch_one(
+            connection,
+            """
+            SELECT
+                (SELECT COUNT(*) FROM research_items) AS research_items,
+                (SELECT COUNT(*) FROM content_ideas) AS ideas,
+                (SELECT COUNT(*) FROM content_ideas WHERE status = 'APPROVED') AS approved,
+                (SELECT COUNT(*) FROM content_ideas WHERE status IN ('SHORTLISTED','REVIEW')) AS review,
+                (SELECT COUNT(*) FROM content_scripts) AS scripts,
+                (SELECT COUNT(*) FROM production_jobs WHERE status != 'FAILED') AS production,
+                (SELECT COUNT(*) FROM publish_requests WHERE status = 'PUBLISHED') AS published,
+                (SELECT COUNT(*) FROM video_metrics) AS analytics,
+                (SELECT COUNT(*) FROM learning_signals) AS learning,
+                (SELECT COUNT(*) FROM automation_jobs WHERE status IN ('QUEUED','RUNNING')) AS automation
+            """,
+        )
+        return {key: counts[key] or 0 for key in counts.keys()}
     finally:
         connection.close()
 
@@ -87,13 +85,12 @@ def dashboard_ideas(limit: int = 20) -> list[dict[str, object]]:
     limit = max(1, min(limit, 100))
     connection = get_connection()
     try:
+        _prepare(connection)
         sql = "SELECT idea_id,title,topic,overall_score,status FROM content_ideas ORDER BY overall_score DESC,created_at ASC LIMIT :limit"
         if using_postgres():
-            initialize_postgres_schema(connection)
             rows = connection.execute(text(sql), {"limit": limit}).mappings().all()
-            return [dict(row) for row in rows]
-        initialize_schema(connection)
-        rows = connection.execute(sql.replace(":limit", "?"), (limit,)).fetchall()
+        else:
+            rows = connection.execute(sql.replace(":limit", "?"), (limit,)).fetchall()
         return [dict(row) for row in rows]
     finally:
         connection.close()
@@ -101,13 +98,10 @@ def dashboard_ideas(limit: int = 20) -> list[dict[str, object]]:
 
 @app.post("/api/admin/bootstrap", dependencies=[Depends(require_api_token)])
 def bootstrap_database() -> dict[str, str]:
-    """Explicitly initialize the production schema once credentials are configured."""
+    """Initialize the configured database schema."""
     connection = get_connection()
     try:
-        if using_postgres():
-            initialize_postgres_schema(connection)
-        else:
-            initialize_schema(connection)
+        _prepare(connection)
         return {"status": "initialized"}
     finally:
         connection.close()
