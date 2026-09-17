@@ -1,0 +1,47 @@
+from app.ideas.from_research import research_to_idea, research_to_ideas
+from app.research.models import ResearchItem
+
+
+def make_item(title: str = "New AI workflow", url: str = "https://example.com/story") -> ResearchItem:
+    return ResearchItem(
+        title=title,
+        summary="AI tools are changing how teams work.",
+        url=url,
+        source_name="Example Source",
+        tags=["AI", "productivity"],
+    )
+
+
+def test_research_to_idea_preserves_evidence():
+    item = make_item()
+    idea = research_to_idea(item)
+
+    assert idea.title == "New AI workflow"
+    assert idea.source == "Example Source"
+    assert idea.why_now == "AI tools are changing how teams work."
+    assert idea.metadata["research_key"] == item.normalized_key()
+    assert idea.metadata["research_url"] == "https://example.com/story"
+    assert idea.metadata["research_tags"] == ["AI", "productivity"]
+
+
+def test_research_to_idea_uses_first_tag_as_topic():
+    idea = research_to_idea(make_item())
+    assert idea.topic == "AI"
+
+
+def test_research_to_idea_has_reviewable_defaults():
+    idea = research_to_idea(make_item())
+
+    assert idea.audience == "Viewers interested in this topic"
+    assert idea.hook == "What you need to know about New AI workflow"
+    assert idea.overall_score is None
+    assert all(value == 0 for value in idea.scores.model_dump().values())
+
+
+def test_research_to_ideas_converts_multiple_items():
+    ideas = research_to_ideas([
+        make_item("One", "https://example.com/one"),
+        make_item("Two", "https://example.com/two"),
+    ])
+
+    assert [idea.title for idea in ideas] == ["One", "Two"]
