@@ -1,12 +1,22 @@
 """Production HTTP API for the ContentOS operator dashboard."""
 
+import json
+
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from app.config.settings import get_settings
 from app.database.connection import get_connection, using_postgres
+from app.database.models import ContentIdea
 from app.database.schema import initialize_postgres_schema, initialize_schema
+from app.ideas.from_research import research_items_to_ideas
+from app.ideas.scorer import score_idea
+from app.research.engine import normalize_items
+from app.research.models import ResearchItem
+from app.research.providers.youtube_rss import YouTubeRSSProvider
+from app.research.repository import ResearchRepository
 
 app = FastAPI(title="ContentOS API", version="1.0.0")
 settings = get_settings()
@@ -17,6 +27,13 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
+
+
+class YouTubeResearchRequest(BaseModel):
+    channel_ids: list[str] = Field(min_length=1, max_length=20)
+    query: str = ""
+    limit: int = Field(default=20, ge=1, le=100)
+    generate_ideas: bool = True
 
 
 def require_api_token(authorization: str | None = Header(default=None)) -> None:
@@ -38,6 +55,47 @@ def _fetch_one(connection, sql: str):
     if using_postgres():
         return connection.execute(text(sql)).mappings().one()
     return connection.execute(sql).fetchone()
+
+
+def _save_ideas(connection, ideas: list[ContentIdea]) -> None:
+    """Persist scored ideas using the active database dialect."""
+    if using_postgres():
+        statement = text(
+            """INSERT INTO content_ideas
+            (idea_id,title,topic,audience,hook,source,why_now,monetization_angle,
+             demand,curiosity,competition,monetization,production,overall_score,status,
+             metadata_json,created_at)
+            VALUES (:id,:title,:topic,:audience,:hook,:source,:why_now,:monetization,
+                    :demand,:curiosity,:competition,:monetization_score,:production,
+                    :overall,:status,:metadata,:created)"""
+        )
+        for idea in ideas:
+            connection.execute(statement, {
+                "id": idea.idea_id, "title": idea.title, "topic": idea.topic,
+                "audience": idea.audience, "hook": idea.hook, "source": idea.source,
+                "why_now": idea.why_now, "monetization": idea.monetization_angle,
+                "demand": idea.scores.demand, "curiosity": idea.scores.curiosity,
+                "competition": idea.scores.competition, "monetization_score": idea.scores.monetization,
+                "production": idea.scores.production, "overall": idea.overall_score,
+                "status": idea.status.value, "metadata": json.dumps(idea.metadata, sort_keys=True),
+                "created": idea.created_at,
+            })
+    else:
+        for idea in ideas:
+            connection.execute(
+                """INSERT OR REPLACE INTO content_ideas
+                (idea_id,title,topic,audience,hook,source,why_now,monetization_angle,
+                 demand,curiosity,competition,monetization,production,overall_score,status,
+                 metadata_json,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (idea.idea_id, idea.title, idea.topic, idea.audience, idea.hook,
+                 idea.source, idea.why_now, idea.monetization_angle,
+                 idea.scores.demand, idea.scores.curiosity, idea.scores.competition,
+                 idea.scores.monetization, idea.scores.production, idea.overall_score,
+                 idea.status.value, json.dumps(idea.metadata, sort_keys=True),
+                 idea.created_at.isoformat()),
+            )
+    connection.commit()
 
 
 @app.get("/")
@@ -69,6 +127,34 @@ def health() -> dict[str, object]:
     finally:
         if connection is not None:
             connection.close()
+
+
+@app.post("/api/research/youtube", dependencies=[Depends(require_api_token)])
+def research_youtube(request: YouTubeResearchRequest) -> dict[str, object]:
+    """Fetch public YouTube uploads, persist evidence, and optionally create ideas."""
+    provider = YouTubeRSSProvider(request.channel_ids)
+    try:
+        items = normalize_items(provider.search(request.query, limit=request.limit))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"YouTube research failed: {type(exc).__name__}: {exc}") from exc
+
+    connection = get_connection()
+    try:
+        _prepare(connection)
+        ResearchRepository(connection, postgres=using_postgres()).save_many(items)
+        ideas: list[ContentIdea] = []
+        if request.generate_ideas and items:
+            ideas = [score_idea(idea) for idea in research_items_to_ideas(items)]
+            _save_ideas(connection, ideas)
+        return {
+            "provider": provider.name,
+            "research_items_found": len(items),
+            "ideas_created": len(ideas),
+            "research": [item.model_dump(mode="json") for item in items],
+            "ideas": [idea.model_dump(mode="json") for idea in ideas],
+        }
+    finally:
+        connection.close()
 
 
 @app.get("/api/dashboard/overview")
