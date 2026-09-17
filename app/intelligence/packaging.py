@@ -18,12 +18,18 @@ _VAGUE = {"amazing", "ultimate", "best", "crazy", "insane", "secret", "things", 
 _STOP = {"the", "a", "an", "and", "or", "to", "of", "in", "for", "is", "this", "that", "with"}
 
 
+def _terms(text: str) -> set[str]:
+    """Return normalized content words for overlap checks."""
+    return {
+        word.lower()
+        for word in re.findall(r"[a-z0-9']+", text)
+        if word.lower() not in _STOP
+    }
+
+
 def lint_package(title: str, thumbnail_text: str = "") -> PackagingReport:
     title_words = [w.lower() for w in re.findall(r"[a-z0-9']+", title)]
-    thumb_words = [w.lower() for w in re.findall(r"[a-z0-9']+", thumbnail_text)]
-    title_set = {w for w in title_words if w not in _STOP}
-    thumb_set = {w for w in thumb_words if w not in _STOP}
-    duplicate = tuple(sorted(title_set & thumb_set))
+    duplicate = tuple(sorted(_terms(title) & _terms(thumbnail_text)))
     vague = tuple(sorted(set(title_words) & _VAGUE))
     notes: list[str] = []
     if len(title) > 80:
@@ -36,4 +42,11 @@ def lint_package(title: str, thumbnail_text: str = "") -> PackagingReport:
     score -= 1.5 if len(title) > 80 else 0
     score -= min(3.0, len(duplicate) * 0.5)
     score -= min(2.0, len(vague) * 0.5)
-    return PackagingReport(len(title), len(title) > 80, duplicate, vague, round(max(0.0, score), 2), tuple(notes))
+    return PackagingReport(
+        len(title),
+        len(title) > 80,
+        duplicate,
+        vague,
+        round(max(0.0, score), 2),
+        tuple(notes),
+    )
