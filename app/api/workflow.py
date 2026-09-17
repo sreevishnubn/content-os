@@ -3,8 +3,7 @@ from datetime import datetime, timezone
 import json
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import text
+from pydantic import BaseModel, Field
 from app.api.common import require_api_token, prepare_database, rows, one, execute
 from app.database.connection import get_connection, using_postgres
 from app.learning.engine import LearningEngine
@@ -50,10 +49,10 @@ def scripts():
 def create_script(request:ScriptDraftRequest):
     c=get_connection()
     try:
-        prepare_database(c); idea=_require(c,"SELECT * FROM content_ideas WHERE idea_id=:id",{"id":request.idea_id},"Idea not found")
+        prepare_database(c); idea=dict(_require(c,"SELECT * FROM content_ideas WHERE idea_id=:id",{"id":request.idea_id},"Idea not found"))
         if idea["status"]!="APPROVED": raise HTTPException(409,f"Only APPROVED ideas can enter scripting; current status is {idea['status']}")
         existing=one(c,"SELECT script_id,version FROM content_scripts WHERE idea_id=:id ORDER BY version DESC LIMIT 1",{"id":request.idea_id}); version=(existing["version"]+1 if existing else 1); sid=str(uuid4()); now=datetime.now(timezone.utc).isoformat()
-        sections=[{"heading":"The setup","narration":f"Today we are breaking down {idea['topic']} and why it matters.","visual_notes":"Relevant source clips, screenshots or b-roll."},{"heading":"What is happening","narration":idea["hook"],"visual_notes":"Show evidence from the research source."},{"heading":"The important details","narration":idea.get("why_now") or "Walk through the key facts and context.","visual_notes":"Use diagrams, captions and supporting visuals."},{"heading":"What to watch next","narration":idea.get("monetization_angle") or "Close with the practical implication for the viewer.","visual_notes":"End card and next-video prompt."}]
+        sections=[{"heading":"The setup","narration":f"Today we are breaking down {idea['topic']} and why it matters.","visual_notes":"Relevant source clips, screenshots or b-roll."},{"heading":"What is happening","narration":idea["hook"],"visual_notes":"Show evidence from the research source."},{"heading":"The important details","narration":idea["why_now"] or "Walk through the key facts and context.","visual_notes":"Use diagrams, captions and supporting visuals."},{"heading":"What to watch next","narration":idea["monetization_angle"] or "Close with the practical implication for the viewer.","visual_notes":"End card and next-video prompt."}]
         _insert(c,"INSERT INTO content_scripts(script_id,idea_id,title,hook,sections_json,closing,fact_check_json,version,created_at) VALUES (:sid,:idea,:title,:hook,:sections,:closing,:facts,:version,:created)",{"sid":sid,"idea":request.idea_id,"title":idea["title"],"hook":idea["hook"],"sections":json.dumps(sections),"closing":"If this was useful, subscribe for the next breakdown.","facts":json.dumps(["Verify every factual claim against source evidence before publishing."]),"version":version,"created":now})
         execute(c,"UPDATE content_ideas SET status='SCRIPTING' WHERE idea_id=:id",{"id":request.idea_id}); c.commit()
         return {"script_id":sid,"idea_id":request.idea_id,"title":idea["title"],"hook":idea["hook"],"sections":sections,"closing":"If this was useful, subscribe for the next breakdown.","fact_check_required":["Verify every factual claim against source evidence before publishing."],"version":version}
