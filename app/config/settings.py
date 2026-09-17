@@ -16,12 +16,13 @@ class Settings(BaseModel):
     database_path: str = "data/content.db"
     api_token: str | None = None
     cors_origins: list[str] = Field(default_factory=list)
-    llm_provider: str | None = "openai"
-    llm_model: str | None = "gpt-5-mini"
+    llm_provider: str | None = "openrouter"
+    llm_model: str | None = "openai/gpt-oss-20b"
 
     @property
     def llm_api_key(self) -> str | None:
         keys = {
+            "openrouter": os.getenv("OPENROUTER_API_KEY"),
             "openai": os.getenv("OPENAI_API_KEY"),
             "anthropic": os.getenv("ANTHROPIC_API_KEY"),
             "gemini": os.getenv("GEMINI_API_KEY"),
@@ -43,11 +44,11 @@ class Settings(BaseModel):
                 raise ValueError("DATABASE_URL is required in production")
             if not self.api_token:
                 raise ValueError("CONTENTOS_API_TOKEN is required in production")
-            if self.llm_provider and self.llm_provider != "openai":
+            if self.llm_provider not in {"openrouter", "openai"}:
                 raise ValueError(f"Unsupported production LLM provider: {self.llm_provider}")
-            if self.llm_provider and not self.llm_model:
+            if not self.llm_model:
                 raise ValueError("CONTENTOS_LLM_MODEL is required when an LLM provider is configured")
-            if self.llm_provider and not self.llm_api_key:
+            if not self.llm_api_key:
                 raise ValueError(f"API credentials are missing for LLM provider '{self.llm_provider}'")
         return self
 
@@ -68,6 +69,6 @@ def get_settings() -> Settings:
         database_path=database_path,
         api_token=os.getenv("CONTENTOS_API_TOKEN") or None,
         cors_origins=[item.strip() for item in origins.split(",") if item.strip()],
-        llm_provider=os.getenv("CONTENTOS_LLM_PROVIDER") or "openai",
-        llm_model=os.getenv("CONTENTOS_LLM_MODEL") or "gpt-5-mini",
+        llm_provider=os.getenv("CONTENTOS_LLM_PROVIDER") or "openrouter",
+        llm_model=os.getenv("CONTENTOS_LLM_MODEL") or "openai/gpt-oss-20b",
     )
