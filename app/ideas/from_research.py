@@ -7,13 +7,31 @@ from app.research.models import ResearchItem
 
 
 ANGLE_TEMPLATES = (
-    ("explainer", "{title}: What is really happening?", "Understand the story behind {title}."),
-    ("how_it_works", "How {title} actually works", "Most people see the result; this explains the process behind {title}."),
-    ("why_it_matters", "Why {title} matters more than you think", "The important part of {title} is what it could change next."),
+    (
+        "explainer",
+        "{title}: What is really happening?",
+        "Understand the story behind {title}.",
+    ),
+    (
+        "how_it_works",
+        "How {title} actually works",
+        "Most people see the result; this explains the process behind {title}.",
+    ),
+    (
+        "why_it_matters",
+        "Why {title} matters more than you think",
+        "The important part of {title} is what it could change next.",
+    ),
 )
 
 
-def _build_idea(item: ResearchItem, *, title: str, hook: str, angle: str | None = None) -> ContentIdea:
+def _build_idea(
+    item: ResearchItem,
+    *,
+    title: str,
+    hook: str,
+    angle: str | None = None,
+) -> ContentIdea:
     """Build one candidate while preserving its research evidence."""
     return ContentIdea(
         title=title,
@@ -21,10 +39,12 @@ def _build_idea(item: ResearchItem, *, title: str, hook: str, angle: str | None 
         audience="Viewers interested in this topic",
         hook=hook,
         source=item.source_name,
-        why_now=item.summary,
+        why_now=None,
         metadata={
             "research_key": item.normalized_key(),
+            "research_summary": item.summary,
             "research_url": str(item.url) if item.url else None,
+            "research_source_name": item.source_name,
             "research_tags": item.tags,
             **({"angle": angle} if angle else {}),
         },
@@ -47,10 +67,8 @@ def research_to_idea(item: ResearchItem) -> ContentIdea:
     )
 
 
-def research_to_ideas(
-    items: Iterable[ResearchItem],
-) -> list[ContentIdea]:
-    """Convert multiple research items using the original one-to-one behavior."""
+def research_to_ideas(items: Iterable[ResearchItem]) -> list[ContentIdea]:
+    """Convert multiple research items using one-to-one behavior."""
     return [research_to_idea(item) for item in items]
 
 
@@ -60,7 +78,11 @@ def research_to_angles(
     angles: Iterable[str] | None = None,
 ) -> list[ContentIdea]:
     """Create several deterministic editorial angles from one research item."""
-    requested = set(angles) if angles is not None else {name for name, _, _ in ANGLE_TEMPLATES}
+    requested = (
+        set(angles)
+        if angles is not None
+        else {name for name, _, _ in ANGLE_TEMPLATES}
+    )
     title = item.title.strip()
     ideas: list[ContentIdea] = []
 
