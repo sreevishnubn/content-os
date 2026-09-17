@@ -27,7 +27,11 @@ function productionActions(job) {
         return productionAction('Open Publishing', `show('publishing')`, 'primary');
     }
 
-    return '<span class="muted">Production stopped. No retry action is available yet.</span>';
+    if (job.status === 'FAILED') {
+        return productionAction('Retry Production', `retryProduction('${job.production_id}')`, 'primary');
+    }
+
+    return '<span class="muted">No action available.</span>';
 }
 
 async function showProduction() {
@@ -79,11 +83,15 @@ async function registerArtifact(id) {
             method: 'POST',
             body: JSON.stringify({ artifact_uri: artifactUri })
         });
-        await request(`/production/${encodeURIComponent(id)}/status`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'READY' })
-        });
-        await showProduction();
+        await setProduction(id, 'READY');
+    } catch (e) {
+        alert(e.message);
+    }
+}
+
+async function retryProduction(id) {
+    try {
+        await setProduction(id, 'QUEUED');
     } catch (e) {
         alert(e.message);
     }
