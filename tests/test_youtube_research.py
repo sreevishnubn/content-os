@@ -1,4 +1,7 @@
+import pytest
+
 from app.research.engine import normalize_items
+from app.research.providers.youtube_resolver import _normalize_source, resolve_channel_id
 from app.research.providers.youtube_rss import parse_youtube_feed
 
 
@@ -29,3 +32,17 @@ def test_parse_youtube_feed():
 def test_normalize_research_deduplicates_urls():
     items = parse_youtube_feed(FEED)
     assert len(normalize_items(items + items)) == 1
+
+
+def test_youtube_resolver_rejects_non_youtube_urls():
+    with pytest.raises(ValueError, match="Only public HTTPS YouTube URLs are allowed"):
+        _normalize_source("https://example.com/@channel/about")
+
+    with pytest.raises(ValueError, match="Only public HTTPS YouTube URLs are allowed"):
+        resolve_channel_id("http://youtube.com/@channel/about")
+
+
+def test_youtube_resolver_accepts_channel_id_without_network_request():
+    channel_id = "UC1234567890123456789012"
+    assert _normalize_source(channel_id) == channel_id
+    assert resolve_channel_id(channel_id) == channel_id
