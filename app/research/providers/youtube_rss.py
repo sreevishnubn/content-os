@@ -5,8 +5,7 @@ from configured channel IDs and converts them into normalized research
 items. It deliberately does not scrape search pages or require a login.
 """
 
-from datetime import datetime
-from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
@@ -39,21 +38,17 @@ def parse_youtube_feed(xml_text: str, *, limit: int = 15) -> list[ResearchItem]:
         if not video_id or not title:
             continue
 
-        published_at: datetime | None = None
+        published_at = None
         if published_raw:
             try:
                 published_at = datetime.fromisoformat(published_raw.replace("Z", "+00:00"))
             except ValueError:
-                try:
-                    published_at = parsedate_to_datetime(published_raw)
-                except (TypeError, ValueError):
-                    published_at = None
+                published_at = None
 
-        summary = description or f"Published by {author}."
         items.append(
             ResearchItem(
                 title=title,
-                summary=summary,
+                summary=description or f"Published by {author}.",
                 url=f"https://www.youtube.com/watch?v={quote(video_id)}",
                 source_name=f"YouTube — {author}",
                 published_at=published_at,
@@ -80,8 +75,7 @@ class YouTubeRSSProvider(ResearchProvider):
             url = f"https://www.youtube.com/feeds/videos.xml?channel_id={quote(channel_id, safe='')}"
             request = Request(url, headers={"User-Agent": "ContentOS/1.0"})
             with urlopen(request, timeout=self.timeout) as response:
-                xml_text = response.read().decode("utf-8")
-            results.extend(parse_youtube_feed(xml_text, limit=50))
+                results.extend(parse_youtube_feed(response.read().decode("utf-8"), limit=50))
 
         normalized_query = query.strip().lower()
         if normalized_query:
@@ -91,5 +85,8 @@ class YouTubeRSSProvider(ResearchProvider):
                 if all(term in f"{item.title} {item.summary}".lower() for term in terms)
             ]
 
-        results.sort(key=lambda item: item.published_at or datetime.min.replace(tzinfo=None), reverse=True)
+        def sort_key(item: ResearchItem) -> datetime:
+            return item.published_at or datetime.min.replace(tzinfo=timezone.utc)
+
+        results.sort(key=sort_key, reverse=True)
         return results[: max(1, min(limit, 100))]
