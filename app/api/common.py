@@ -55,5 +55,12 @@ def rows(connection, sql: str, params: dict | None = None):
 
 
 def one(connection, sql: str, params: dict | None = None):
+    """Return the first matching row, or None when no row exists.
+
+    This helper is intentionally optional-row semantics. Several workflow
+    lookups use ``LIMIT 1`` to probe for an existing record; SQLAlchemy's
+    ``one()`` raises NoResultFound when that record does not exist, which
+    turns a normal first-run condition into an HTTP 500 on PostgreSQL.
+    """
     result = execute(connection, sql, params)
-    return result.mappings().one() if using_postgres() else result.fetchone()
+    return result.mappings().first() if using_postgres() else result.fetchone()
