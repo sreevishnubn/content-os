@@ -60,7 +60,7 @@ def _seed_research(client, db_path, monkeypatch):
         def __init__(self, provider):
             self.provider = provider
 
-        def generate(self, *, idea, evidence):
+        def generate(self, *, idea, evidence, version=1):
             from app.scripts.models import ContentScript, ScriptSection
             return ContentScript(
                 idea_id=idea["idea_id"],
@@ -74,7 +74,7 @@ def _seed_research(client, db_path, monkeypatch):
                 ],
                 closing="Subscribe for the next breakdown.",
                 fact_check_required=[],
-                version=1,
+                version=version,
             )
 
     monkeypatch.setattr(api_module, "resolve_channel_ids", lambda sources: ["UC12345678901234567890"])
