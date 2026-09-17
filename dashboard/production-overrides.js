@@ -4,6 +4,37 @@ function productionAction(label, fn, cls = 'secondary') {
     return button(label, fn, cls);
 }
 
+function ensureProductionResetButton() {
+    const top = document.querySelector('#production .top');
+    if (!top || top.querySelector('#production-reset')) return;
+    const refresh = top.querySelector('button');
+    const reset = document.createElement('button');
+    reset.id = 'production-reset';
+    reset.className = 'btn danger';
+    reset.textContent = 'Reset Demo';
+    reset.onclick = resetDemoData;
+    if (refresh) {
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+        refresh.replaceWith(actions);
+        actions.append(refresh, reset);
+    } else {
+        top.appendChild(reset);
+    }
+}
+
+async function resetDemoData() {
+    if (!confirm('Reset ContentOS demo data? This clears research, ideas, scripts, production, publishing, analytics, learning and automation records.')) return;
+    try {
+        await request('/admin/reset-demo', { method: 'POST' });
+        await showProduction();
+        if (typeof showOverview === 'function') await showOverview();
+        if (typeof showProduction === 'function') await showProduction();
+    } catch (e) {
+        alert(e.message);
+    }
+}
+
 function productionActions(job) {
     if (job.status === 'QUEUED') {
         return productionAction('Prepare Assets', `setProduction('${job.production_id}','ASSETS')`, 'primary');
@@ -36,6 +67,7 @@ function productionActions(job) {
 
 async function showProduction() {
     document.getElementById('production').classList.add('active');
+    ensureProductionResetButton();
     try {
         const data = await request('/production');
         $('production-list').innerHTML = data.length
