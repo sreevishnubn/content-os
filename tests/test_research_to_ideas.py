@@ -7,7 +7,10 @@ from app.ideas.from_research import (
 from app.research.models import ResearchItem
 
 
-def make_item(title: str = "New AI workflow", url: str = "https://example.com/story") -> ResearchItem:
+def make_item(
+    title: str = "New AI workflow",
+    url: str = "https://example.com/story",
+) -> ResearchItem:
     return ResearchItem(
         title=title,
         summary="AI tools are changing how teams work.",
@@ -23,9 +26,11 @@ def test_research_to_idea_preserves_evidence():
 
     assert idea.title == "New AI workflow"
     assert idea.source == "Example Source"
-    assert idea.why_now == "AI tools are changing how teams work."
+    assert idea.why_now is None
     assert idea.metadata["research_key"] == item.normalized_key()
+    assert idea.metadata["research_summary"] == "AI tools are changing how teams work."
     assert idea.metadata["research_url"] == "https://example.com/story"
+    assert idea.metadata["research_source_name"] == "Example Source"
     assert idea.metadata["research_tags"] == ["AI", "productivity"]
     assert "angle" not in idea.metadata
 
