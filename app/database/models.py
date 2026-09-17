@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +10,7 @@ class IdeaStatus(StrEnum):
     DISCOVERED = "DISCOVERED"
     SHORTLISTED = "SHORTLISTED"
     APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
     SCRIPTING = "SCRIPTING"
     PRODUCTION = "PRODUCTION"
     REVIEW = "REVIEW"
@@ -25,6 +27,7 @@ class IdeaScores(BaseModel):
 
 
 class ContentIdea(BaseModel):
+    idea_id: str = Field(default_factory=lambda: str(uuid4()))
     title: str
     topic: str
     audience: str
