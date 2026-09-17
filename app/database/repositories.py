@@ -25,23 +25,12 @@ class IdeaRepository:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                idea.idea_id,
-                idea.title,
-                idea.topic,
-                idea.audience,
-                idea.hook,
-                idea.source,
-                idea.why_now,
-                idea.monetization_angle,
-                idea.scores.demand,
-                idea.scores.curiosity,
-                idea.scores.competition,
-                idea.scores.monetization,
-                idea.scores.production,
-                idea.overall_score,
-                idea.status.value,
-                json.dumps(idea.metadata, sort_keys=True),
-                idea.created_at.isoformat(),
+                idea.idea_id, idea.title, idea.topic, idea.audience, idea.hook,
+                idea.source, idea.why_now, idea.monetization_angle,
+                idea.scores.demand, idea.scores.curiosity, idea.scores.competition,
+                idea.scores.monetization, idea.scores.production,
+                idea.overall_score, idea.status.value,
+                json.dumps(idea.metadata, sort_keys=True), idea.created_at.isoformat(),
             ),
         )
         self.connection.commit()
@@ -62,19 +51,13 @@ class IdeaRepository:
 
     def list(self, *, status: IdeaStatus | None = None) -> list[ContentIdea]:
         """Return ideas ordered by score, optionally filtered by status."""
-        if status is None:
-            rows = self.connection.execute(
-                "SELECT * FROM content_ideas ORDER BY overall_score DESC, created_at DESC"
-            ).fetchall()
-        else:
-            rows = self.connection.execute(
-                """
-                SELECT * FROM content_ideas
-                WHERE status = ?
-                ORDER BY overall_score DESC, created_at DESC
-                """,
-                (status.value,),
-            ).fetchall()
+        query = "SELECT * FROM content_ideas"
+        params: tuple[str, ...] = ()
+        if status is not None:
+            query += " WHERE status = ?"
+            params = (status.value,)
+        query += " ORDER BY overall_score DESC, created_at ASC"
+        rows = self.connection.execute(query, params).fetchall()
         return [self._from_row(row) for row in rows]
 
     def update_status(self, idea_id: str, status: IdeaStatus) -> ContentIdea | None:
@@ -92,23 +75,15 @@ class IdeaRepository:
     def _from_row(row: sqlite3.Row) -> ContentIdea:
         """Reconstruct a validated ContentIdea from a database row."""
         return ContentIdea(
-            idea_id=row["idea_id"],
-            title=row["title"],
-            topic=row["topic"],
-            audience=row["audience"],
-            hook=row["hook"],
-            source=row["source"],
-            why_now=row["why_now"],
-            monetization_angle=row["monetization_angle"],
+            idea_id=row["idea_id"], title=row["title"], topic=row["topic"],
+            audience=row["audience"], hook=row["hook"], source=row["source"],
+            why_now=row["why_now"], monetization_angle=row["monetization_angle"],
             scores=IdeaScores(
-                demand=row["demand"],
-                curiosity=row["curiosity"],
-                competition=row["competition"],
-                monetization=row["monetization"],
+                demand=row["demand"], curiosity=row["curiosity"],
+                competition=row["competition"], monetization=row["monetization"],
                 production=row["production"],
             ),
-            overall_score=row["overall_score"],
-            status=IdeaStatus(row["status"]),
+            overall_score=row["overall_score"], status=IdeaStatus(row["status"]),
             metadata=json.loads(row["metadata_json"]),
             created_at=datetime.fromisoformat(row["created_at"]),
         )
