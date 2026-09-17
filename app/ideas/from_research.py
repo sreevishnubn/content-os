@@ -1,4 +1,4 @@
-"""Convert research evidence into multiple reviewable content angles."""
+"""Convert research evidence into reviewable content ideas and angles."""
 
 from collections.abc import Iterable
 
@@ -13,62 +13,75 @@ ANGLE_TEMPLATES = (
 )
 
 
+def _build_idea(item: ResearchItem, *, title: str, hook: str, angle: str | None = None) -> ContentIdea:
+    """Build one candidate while preserving its research evidence."""
+    return ContentIdea(
+        title=title,
+        topic=item.tags[0] if item.tags else "General",
+        audience="Viewers interested in this topic",
+        hook=hook,
+        source=item.source_name,
+        why_now=item.summary,
+        metadata={
+            "research_key": item.normalized_key(),
+            "research_url": str(item.url) if item.url else None,
+            "research_tags": item.tags,
+            **({"angle": angle} if angle else {}),
+        },
+        scores={
+            "demand": 0,
+            "curiosity": 0,
+            "competition": 0,
+            "monetization": 0,
+            "production": 0,
+        },
+    )
+
+
+def research_to_idea(item: ResearchItem) -> ContentIdea:
+    """Create the original single candidate for backward compatibility."""
+    return _build_idea(
+        item,
+        title=item.title.strip(),
+        hook=f"What you need to know about {item.title.strip()}",
+    )
+
+
 def research_to_ideas(
+    items: Iterable[ResearchItem],
+) -> list[ContentIdea]:
+    """Convert multiple research items using the original one-to-one behavior."""
+    return [research_to_idea(item) for item in items]
+
+
+def research_to_angles(
     item: ResearchItem,
     *,
     angles: Iterable[str] | None = None,
 ) -> list[ContentIdea]:
-    """Create several deterministic editorial angles from one research item.
-
-    This V0 implementation deliberately does not call an LLM. It creates
-    distinct candidate frames while preserving the same research evidence so
-    a later provider can replace the angle-generation strategy without
-    changing the downstream idea/scoring pipeline.
-    """
+    """Create several deterministic editorial angles from one research item."""
     requested = set(angles) if angles is not None else {name for name, _, _ in ANGLE_TEMPLATES}
     title = item.title.strip()
-    topic = item.tags[0] if item.tags else "General"
-
     ideas: list[ContentIdea] = []
+
     for angle_name, title_template, hook_template in ANGLE_TEMPLATES:
         if angle_name not in requested:
             continue
-
         ideas.append(
-            ContentIdea(
+            _build_idea(
+                item,
                 title=title_template.format(title=title),
-                topic=topic,
-                audience="Viewers interested in this topic",
                 hook=hook_template.format(title=title),
-                source=item.source_name,
-                why_now=item.summary,
-                metadata={
-                    "research_key": item.normalized_key(),
-                    "research_url": str(item.url) if item.url else None,
-                    "research_tags": item.tags,
-                    "angle": angle_name,
-                },
-                scores={
-                    "demand": 0,
-                    "curiosity": 0,
-                    "competition": 0,
-                    "monetization": 0,
-                    "production": 0,
-                },
+                angle=angle_name,
             )
         )
 
     return ideas
 
 
-def research_to_idea(item: ResearchItem) -> ContentIdea:
-    """Backward-compatible single-angle conversion."""
-    return research_to_ideas(item, angles=["explainer"])[0]
-
-
 def research_items_to_ideas(items: Iterable[ResearchItem]) -> list[ContentIdea]:
     """Convert multiple research items into multiple candidate angles."""
     ideas: list[ContentIdea] = []
     for item in items:
-        ideas.extend(research_to_ideas(item))
+        ideas.extend(research_to_angles(item))
     return ideas
