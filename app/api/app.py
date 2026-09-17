@@ -50,8 +50,9 @@ def root() -> dict[str, str]:
 @app.get("/health")
 def health() -> dict[str, object]:
     """Verify that the API can reach its configured database."""
-    connection = get_connection()
+    connection = None
     try:
+        connection = get_connection()
         if using_postgres():
             connection.execute(text("SELECT 1"))
         else:
@@ -65,10 +66,11 @@ def health() -> dict[str, object]:
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail=f"Database health check failed: {type(exc).__name__}",
+            detail=f"Database health check failed: {type(exc).__name__}: {exc}",
         ) from exc
     finally:
-        connection.close()
+        if connection is not None:
+            connection.close()
 
 
 @app.get("/api/dashboard/overview")
