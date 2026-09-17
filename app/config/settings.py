@@ -2,7 +2,7 @@ import os
 from functools import lru_cache
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 load_dotenv()
 
@@ -35,6 +35,21 @@ class Settings(BaseModel):
     @property
     def is_vercel(self) -> bool:
         return bool(os.getenv("VERCEL"))
+
+    @model_validator(mode="after")
+    def validate_production(self):
+        if self.is_production:
+            if not self.database_url:
+                raise ValueError("DATABASE_URL is required in production")
+            if not self.api_token:
+                raise ValueError("CONTENTOS_API_TOKEN is required in production")
+            if self.llm_provider and self.llm_provider != "openai":
+                raise ValueError(f"Unsupported production LLM provider: {self.llm_provider}")
+            if self.llm_provider and not self.llm_model:
+                raise ValueError("CONTENTOS_LLM_MODEL is required when an LLM provider is configured")
+            if self.llm_provider and not self.llm_api_key:
+                raise ValueError(f"API credentials are missing for LLM provider '{self.llm_provider}'")
+        return self
 
 
 @lru_cache(maxsize=1)
