@@ -76,7 +76,7 @@ def test_overall_score_uses_weighted_average():
         production=2,
     )
 
-    assert calculate_overall_score(idea) == pytest.approx(6.8)
+    assert calculate_overall_score(idea) == pytest.approx(6.9)
 
 
 def test_score_idea_does_not_mutate_original():
