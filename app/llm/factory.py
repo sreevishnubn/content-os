@@ -1,8 +1,8 @@
 """Construct configured LLM providers from runtime settings."""
 
 from app.config.settings import get_settings
+from app.integrations.openai_provider import OpenAIProvider
 from app.llm.interface import LLMProvider
-from app.llm.providers.openai import OpenAIProvider
 
 
 def get_llm_provider() -> LLMProvider:
