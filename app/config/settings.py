@@ -16,8 +16,8 @@ class Settings(BaseModel):
     database_path: str = "data/content.db"
     api_token: str | None = None
     cors_origins: list[str] = Field(default_factory=list)
-    llm_provider: str | None = None
-    llm_model: str | None = None
+    llm_provider: str | None = "openai"
+    llm_model: str | None = "gpt-5.6-luna"
 
     @property
     def llm_api_key(self) -> str | None:
@@ -68,6 +68,6 @@ def get_settings() -> Settings:
         database_path=database_path,
         api_token=os.getenv("CONTENTOS_API_TOKEN") or None,
         cors_origins=[item.strip() for item in origins.split(",") if item.strip()],
-        llm_provider=os.getenv("CONTENTOS_LLM_PROVIDER") or None,
-        llm_model=os.getenv("CONTENTOS_LLM_MODEL") or None,
+        llm_provider=os.getenv("CONTENTOS_LLM_PROVIDER") or "openai",
+        llm_model=os.getenv("CONTENTOS_LLM_MODEL") or "gpt-5.6-luna",
     )
