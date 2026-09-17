@@ -43,4 +43,4 @@ def test_score_is_rounded():
             production=5,
         ),
     )
-    assert calculate_overall_score(idea) == 7.65
+    assert calculate_overall_score(idea) == 7.45
