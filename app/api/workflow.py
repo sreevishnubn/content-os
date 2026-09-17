@@ -31,12 +31,14 @@ class LearningIn(BaseModel):
     source_video_id: str | None = None; signal_type: str = Field(min_length=1, max_length=50); observation: str = Field(min_length=1, max_length=2000); confidence: float = Field(default=.5, ge=0, le=1)
 class AutomationIn(BaseModel): job_type: str = Field(min_length=1, max_length=100); payload: dict = Field(default_factory=dict)
 
+
 def _insert(c, sql, p): execute(c, sql, p); c.commit()
 def _json_rows(c, sql, p=None): return [dict(r) for r in rows(c, sql, p)]
 def _require(c, sql, p, message):
     r = one(c, sql, p)
     if not r: raise HTTPException(404, message)
     return r
+
 
 def _set_status(c, table, key, keycol, status, allowed):
     if status not in allowed: raise HTTPException(422, "Invalid status")
@@ -47,6 +49,20 @@ def _set_status(c, table, key, keycol, status, allowed):
     if status not in transitions.get(current_status, set()): raise HTTPException(409, f"Invalid transition: {current_status} -> {status}")
     _insert(c, f"UPDATE {table} SET status=:status WHERE {keycol}=:id", {"status": status, "id": key})
     return status
+
+@router.post("/admin/reset-demo")
+def reset_demo_data():
+    """Clear all ContentOS V0 data so a new end-to-end demo starts clean."""
+    c = get_connection()
+    try:
+        prepare_database(c)
+        tables = ("learning_signals", "video_metrics", "publish_requests", "production_jobs", "content_scripts", "content_ideas", "research_items", "automation_jobs")
+        for table in tables:
+            execute(c, f"DELETE FROM {table}")
+        c.commit()
+        return {"status": "reset", "tables_cleared": list(tables)}
+    finally:
+        c.close()
 
 @router.get("/scripts")
 def scripts():
