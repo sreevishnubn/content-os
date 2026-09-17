@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from app.config.settings import get_settings
 from app.database.schema import initialize_schema
 from app.research.models import ResearchItem
+from app.llm.models import LLMResponse
 
 
 @pytest.fixture
@@ -17,6 +18,9 @@ def e2e_client(tmp_path, monkeypatch):
     monkeypatch.setenv("CONTENTOS_DATABASE_PATH", str(db_path))
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("CONTENTOS_API_TOKEN", raising=False)
+    monkeypatch.setenv("CONTENTOS_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("CONTENTOS_LLM_MODEL", "test-model")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     get_settings.cache_clear()
 
     from app.api.app import app
@@ -41,6 +45,7 @@ def _seed_research(client, db_path, monkeypatch):
     )
 
     from app.api import app as api_module
+    import app.api.workflow as workflow_module
 
     class FakeProvider:
         name = "fake"
@@ -51,8 +56,31 @@ def _seed_research(client, db_path, monkeypatch):
         def search(self, query, limit=20):
             return [item]
 
+    class FakeScriptGenerator:
+        def __init__(self, provider):
+            self.provider = provider
+
+        def generate(self, *, idea, evidence):
+            from app.scripts.models import ContentScript, ScriptSection
+            return ContentScript(
+                idea_id=idea["idea_id"],
+                title=idea["title"],
+                hook="A tested hook for this workflow.",
+                sections=[
+                    ScriptSection(heading="Setup", narration="Set up the story.", visual_notes="B-roll"),
+                    ScriptSection(heading="Evidence", narration="Explain the evidence.", visual_notes="Source"),
+                    ScriptSection(heading="Context", narration="Add context.", visual_notes="Diagram"),
+                    ScriptSection(heading="Next", narration="Explain what to watch next.", visual_notes="End card"),
+                ],
+                closing="Subscribe for the next breakdown.",
+                fact_check_required=[],
+                version=1,
+            )
+
     monkeypatch.setattr(api_module, "resolve_channel_ids", lambda sources: ["UC12345678901234567890"])
     monkeypatch.setattr(api_module, "YouTubeRSSProvider", FakeProvider)
+    monkeypatch.setattr(workflow_module, "ScriptGenerator", FakeScriptGenerator)
+    monkeypatch.setattr(workflow_module, "get_llm_provider", lambda: object())
 
     response = client.post(
         "/api/research/youtube",
