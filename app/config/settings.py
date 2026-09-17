@@ -32,6 +32,10 @@ class Settings(BaseModel):
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
 
+    @property
+    def is_vercel(self) -> bool:
+        return bool(os.getenv("VERCEL"))
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
@@ -39,10 +43,14 @@ def get_settings() -> Settings:
         "CONTENTOS_CORS_ORIGINS",
         "https://sreevishnubn.github.io,https://dashboard.youtube.analysis.com,http://localhost:5500,http://localhost:8000",
     )
+    database_path = os.getenv("CONTENTOS_DATABASE_PATH")
+    if not database_path:
+        database_path = "/tmp/content.db" if os.getenv("VERCEL") else "data/content.db"
+
     return Settings(
         environment=os.getenv("CONTENTOS_ENVIRONMENT", "development"),
         database_url=os.getenv("DATABASE_URL") or None,
-        database_path=os.getenv("CONTENTOS_DATABASE_PATH", "data/content.db"),
+        database_path=database_path,
         api_token=os.getenv("CONTENTOS_API_TOKEN") or None,
         cors_origins=[item.strip() for item in origins.split(",") if item.strip()],
         llm_provider=os.getenv("CONTENTOS_LLM_PROVIDER") or None,
