@@ -18,7 +18,7 @@ def fake_llm_for_workflow_tests(monkeypatch):
         def __init__(self, provider):
             self.provider = provider
 
-        def generate(self, *, idea, evidence):
+        def generate(self, *, idea, evidence, version=1):
             return ContentScript(
                 idea_id=idea["idea_id"],
                 title=idea["title"],
@@ -31,7 +31,7 @@ def fake_llm_for_workflow_tests(monkeypatch):
                 ],
                 closing="Subscribe for the next breakdown.",
                 fact_check_required=[],
-                version=1,
+                version=version,
             )
 
     monkeypatch.setattr(workflow_module, "ScriptGenerator", FakeScriptGenerator)
