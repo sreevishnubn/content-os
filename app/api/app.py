@@ -39,15 +39,25 @@ def _fetch_one(connection, sql: str):
     return connection.execute(sql).fetchone()
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    """Return a small deployment status document instead of a 404 at the root."""
+    return {"service": "ContentOS API", "status": "online", "health": "/health"}
+
+
 @app.get("/health")
 def health() -> dict[str, object]:
+    """Verify that the API can reach its configured database."""
     connection = get_connection()
     try:
         if using_postgres():
             connection.execute(text("SELECT 1"))
         else:
-            initialize_schema(connection)
+            _prepare(connection)
+            connection.execute("SELECT 1")
         return {"status": "ok", "service": "contentos-api", "database": "postgres" if using_postgres() else "sqlite"}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Database health check failed: {type(exc).__name__}") from exc
     finally:
         connection.close()
 
