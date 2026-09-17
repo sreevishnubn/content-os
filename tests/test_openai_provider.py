@@ -9,7 +9,7 @@ def test_openai_provider_normalizes_response(monkeypatch):
         def create(self, **kwargs):
             assert kwargs["model"] == "gpt-test"
             assert kwargs["input"] == "hello"
-            assert kwargs["instructions"] == ""
+            assert kwargs["instructions"] is None
             return SimpleNamespace(
                 id="resp_123",
                 model="gpt-test",
