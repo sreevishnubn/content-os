@@ -20,15 +20,16 @@ _STOP = {"the", "a", "an", "and", "or", "to", "of", "in", "for", "is", "this", "
 
 def _terms(text: str) -> set[str]:
     """Return normalized content words for overlap checks."""
+    normalized = text.lower()
     return {
-        word.lower()
-        for word in re.findall(r"[a-z0-9']+", text)
-        if word.lower() not in _STOP
+        word
+        for word in re.findall(r"[a-z0-9']+", normalized)
+        if word not in _STOP
     }
 
 
 def lint_package(title: str, thumbnail_text: str = "") -> PackagingReport:
-    title_words = [w.lower() for w in re.findall(r"[a-z0-9']+", title)]
+    title_words = list(_terms(title))
     duplicate = tuple(sorted(_terms(title) & _terms(thumbnail_text)))
     vague = tuple(sorted(set(title_words) & _VAGUE))
     notes: list[str] = []
