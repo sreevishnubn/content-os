@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 
 from app.database.models import ContentIdea
+from app.ideas.generator import build_idea
 from app.research.models import ResearchItem
 
 
@@ -25,45 +26,41 @@ ANGLE_TEMPLATES = (
 )
 
 
-def _build_idea(
+def _build_research_idea(
     item: ResearchItem,
     *,
     title: str,
     hook: str,
     angle: str | None = None,
 ) -> ContentIdea:
-    """Build one candidate while preserving its research evidence."""
-    return ContentIdea(
+    """Build a candidate through the shared provider-agnostic builder."""
+    metadata = {
+        "research_key": item.normalized_key(),
+        "research_summary": item.summary,
+        "research_url": str(item.url) if item.url else None,
+        "research_source_name": item.source_name,
+        "research_tags": item.tags,
+    }
+    if angle:
+        metadata["angle"] = angle
+
+    return build_idea(
         title=title,
         topic=item.tags[0] if item.tags else "General",
         audience="Viewers interested in this topic",
         hook=hook,
         source=item.source_name,
-        why_now=None,
-        metadata={
-            "research_key": item.normalized_key(),
-            "research_summary": item.summary,
-            "research_url": str(item.url) if item.url else None,
-            "research_source_name": item.source_name,
-            "research_tags": item.tags,
-            **({"angle": angle} if angle else {}),
-        },
-        scores={
-            "demand": 0,
-            "curiosity": 0,
-            "competition": 0,
-            "monetization": 0,
-            "production": 0,
-        },
+        metadata=metadata,
     )
 
 
 def research_to_idea(item: ResearchItem) -> ContentIdea:
     """Create the original single candidate for backward compatibility."""
-    return _build_idea(
+    title = item.title.strip()
+    return _build_research_idea(
         item,
-        title=item.title.strip(),
-        hook=f"What you need to know about {item.title.strip()}",
+        title=title,
+        hook=f"What you need to know about {title}",
     )
 
 
@@ -90,7 +87,7 @@ def research_to_angles(
         if angle_name not in requested:
             continue
         ideas.append(
-            _build_idea(
+            _build_research_idea(
                 item,
                 title=title_template.format(title=title),
                 hook=hook_template.format(title=title),
