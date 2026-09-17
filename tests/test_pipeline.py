@@ -1,4 +1,9 @@
-from app.ideas.scorer import calculate_overall_score
+import sqlite3
+
+from app.database.repositories import IdeaRepository
+from app.database.schema import initialize_schema
+from app.database.models import IdeaStatus
+from app.ideas.review import IdeaReviewService
 from app.main import run_pipeline
 from app.research.models import ResearchItem
 
@@ -20,17 +25,33 @@ def test_end_to_end_research_to_ranked_ideas():
 
     normalized, ranked = run_pipeline([first, duplicate, second])
 
-    # Research normalization removes the duplicate before idea generation.
     assert len(normalized) == 2
     assert normalized[0].title == "First research story"
-
-    # Each normalized research item produces three editorial candidates.
     assert len(ranked) == 6
     assert all(idea.overall_score is not None for idea in ranked)
-
-    # Evidence survives the conversion into ContentIdea metadata.
     assert all("research_key" in idea.metadata for idea in ranked)
     assert all("research_summary" in idea.metadata for idea in ranked)
+    assert all(idea.overall_score == 0 for idea in ranked)
 
-    # V0 candidates use neutral zero-valued scoring until scoring intelligence exists.
-    assert all(calculate_overall_score(idea) == 0 for idea in ranked)
+
+def test_end_to_end_persist_and_review():
+    _, ranked = run_pipeline([make_item("Reviewable story", "https://example.com/review")])
+
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    initialize_schema(connection)
+    repository = IdeaRepository(connection)
+    review = IdeaReviewService(repository)
+
+    repository.save_many(ranked)
+
+    stored = repository.list()
+    assert len(stored) == 3
+    assert all(idea.status == IdeaStatus.DISCOVERED for idea in stored)
+
+    selected = stored[0]
+    review.shortlist(selected.idea_id)
+    approved = review.approve(selected.idea_id)
+
+    assert approved.status == IdeaStatus.APPROVED
+    assert repository.list(status=IdeaStatus.APPROVED)[0].idea_id == selected.idea_id
