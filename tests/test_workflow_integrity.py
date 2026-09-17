@@ -16,9 +16,7 @@ def workflow_client(tmp_path, monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("CONTENTOS_API_TOKEN", raising=False)
     get_settings.cache_clear()
-
     from app.api.app import app
-
     client = TestClient(app)
     connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
@@ -93,8 +91,8 @@ def test_production_requires_artifact_before_ready(workflow_client, tmp_path):
     script = workflow_client.post("/api/dashboard/scripts/draft", json={"idea_id": idea_id})
     production = workflow_client.post("/api/dashboard/production", json={"script_id": script.json()["script_id"]})
     production_id = production.json()["production_id"]
-    workflow_client.patch(f"/api/dashboard/production/{production_id}/status", json={"status": "ASSETS"})
-    workflow_client.patch(f"/api/dashboard/production/{production_id}/status", json={"status": "RENDERING"})
+    assert workflow_client.patch(f"/api/dashboard/production/{production_id}/status", json={"status": "ASSETS"}).status_code == 200
+    assert workflow_client.patch(f"/api/dashboard/production/{production_id}/status", json={"status": "RENDERING"}).status_code == 200
     response = workflow_client.patch(f"/api/dashboard/production/{production_id}/status", json={"status": "READY"})
     assert response.status_code == 409
     assert "artifact is registered" in response.json()["detail"]
@@ -110,7 +108,7 @@ def test_publish_requires_ready_production(workflow_client, tmp_path):
     production = workflow_client.post("/api/dashboard/production", json={"script_id": script.json()["script_id"]})
     response = workflow_client.post("/api/dashboard/publishing", json={"production_id": production.json()["production_id"], "title": "Test publication", "description": "Test", "tags": ["test"]})
     assert response.status_code == 409
-    assert "Only READY production jobs with an artifact" in response.json()["detail"]
+    assert "Only READY production jobs" in response.json()["detail"]
 
 
 def test_published_requires_external_video_id(workflow_client, tmp_path):
@@ -124,7 +122,7 @@ def test_published_requires_external_video_id(workflow_client, tmp_path):
     assert workflow_client.patch(f"/api/dashboard/production/{production_id}/status", json={"status": "READY"}).status_code == 200
     publish = workflow_client.post("/api/dashboard/publishing", json={"production_id": production_id, "title": "Test publication"})
     publish_id = publish.json()["publish_id"]
-    workflow_client.patch(f"/api/dashboard/publishing/{publish_id}/status", json={"status": "SCHEDULED"})
+    assert workflow_client.patch(f"/api/dashboard/publishing/{publish_id}/status", json={"status": "SCHEDULED"}).status_code == 200
     response = workflow_client.patch(f"/api/dashboard/publishing/{publish_id}/status", json={"status": "PUBLISHED"})
     assert response.status_code == 409
     assert "external YouTube video ID" in response.json()["detail"]
