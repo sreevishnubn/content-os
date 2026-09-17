@@ -9,7 +9,7 @@ from sqlalchemy import text
 
 from app.config.settings import get_settings
 from app.database.connection import get_connection, using_postgres
-from app.database.models import ContentIdea
+from app.database.models import ContentIdea, IdeaStatus
 from app.database.schema import initialize_postgres_schema, initialize_schema
 from app.ideas.from_research import research_items_to_ideas
 from app.ideas.scorer import score_idea
@@ -30,8 +30,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Vercel's FastAPI integration supports serving a frontend directory directly
-# from the same application while keeping /api/* as the backend boundary.
 app.frontend("/", directory="dashboard")
 
 
@@ -42,6 +40,10 @@ class YouTubeResearchRequest(BaseModel):
     query: str = ""
     limit: int = Field(default=20, ge=1, le=100)
     generate_ideas: bool = True
+
+
+class IdeaStatusUpdate(BaseModel):
+    status: IdeaStatus
 
 
 def require_api_token(authorization: str | None = Header(default=None)) -> None:
@@ -104,6 +106,16 @@ def _save_ideas(connection, ideas: list[ContentIdea]) -> None:
                  idea.created_at.isoformat()),
             )
     connection.commit()
+
+
+def _idea_from_row(row) -> dict[str, object]:
+    item = dict(row)
+    metadata = item.pop("metadata_json", "{}") or "{}"
+    try:
+        item["metadata"] = json.loads(metadata)
+    except (TypeError, json.JSONDecodeError):
+        item["metadata"] = {}
+    return item
 
 
 @app.get("/health")
@@ -213,18 +225,53 @@ def dashboard_overview() -> dict[str, object]:
 
 
 @app.get("/api/dashboard/ideas")
-def dashboard_ideas(limit: int = 20) -> list[dict[str, object]]:
-    """Return ranked ideas for the dashboard."""
+def dashboard_ideas(limit: int = 20, status: IdeaStatus | None = None) -> list[dict[str, object]]:
+    """Return detailed, ranked ideas for the dashboard, optionally filtered by status."""
     limit = max(1, min(limit, 100))
     connection = get_connection()
     try:
         _prepare(connection)
-        sql = "SELECT idea_id,title,topic,overall_score,status FROM content_ideas ORDER BY overall_score DESC,created_at ASC LIMIT :limit"
+        where = ""
+        params: dict[str, object] = {"limit": limit}
+        if status is not None:
+            where = " WHERE status = :status"
+            params["status"] = status.value
+        sql = """SELECT idea_id,title,topic,audience,hook,source,why_now,monetization_angle,
+                         demand,curiosity,competition,monetization,production,overall_score,
+                         status,metadata_json,created_at
+                  FROM content_ideas""" + where + " ORDER BY overall_score DESC,created_at ASC LIMIT :limit"
         if using_postgres():
-            rows = connection.execute(text(sql), {"limit": limit}).mappings().all()
+            rows = connection.execute(text(sql), params).mappings().all()
         else:
-            rows = connection.execute(sql.replace(":limit", "?"), (limit,)).fetchall()
-        return [dict(row) for row in rows]
+            if status is None:
+                rows = connection.execute(sql.replace(":limit", "?"), (limit,)).fetchall()
+            else:
+                rows = connection.execute(sql.replace(":status", "?").replace(":limit", "?"), (status.value, limit)).fetchall()
+        return [_idea_from_row(row) for row in rows]
+    finally:
+        connection.close()
+
+
+@app.patch("/api/dashboard/ideas/{idea_id}/status", dependencies=[Depends(require_api_token)])
+def update_idea_status(idea_id: str, request: IdeaStatusUpdate) -> dict[str, object]:
+    """Move an idea through the human review workflow."""
+    connection = get_connection()
+    try:
+        _prepare(connection)
+        if using_postgres():
+            result = connection.execute(
+                text("UPDATE content_ideas SET status = :status WHERE idea_id = :idea_id"),
+                {"status": request.status.value, "idea_id": idea_id},
+            )
+        else:
+            result = connection.execute(
+                "UPDATE content_ideas SET status = ? WHERE idea_id = ?",
+                (request.status.value, idea_id),
+            )
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Idea not found")
+        connection.commit()
+        return {"idea_id": idea_id, "status": request.status.value}
     finally:
         connection.close()
 
