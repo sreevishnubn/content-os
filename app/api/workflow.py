@@ -5,9 +5,12 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from app.api.common import require_api_token, prepare_database, rows, one, execute
+from app.config.settings import get_settings
 from app.database.connection import get_connection, using_postgres
 from app.learning.engine import LearningEngine
 from app.analytics.models import VideoMetrics
+from app.llm.factory import get_llm_provider
+from app.scripts.generator import ScriptGenerator
 
 router=APIRouter(prefix="/api/dashboard",dependencies=[Depends(require_api_token)])
 class ScriptDraftRequest(BaseModel): idea_id:str
@@ -49,13 +52,22 @@ def scripts():
 def create_script(request:ScriptDraftRequest):
     c=get_connection()
     try:
-        prepare_database(c); idea=dict(_require(c,"SELECT * FROM content_ideas WHERE idea_id=:id",{"id":request.idea_id},"Idea not found"))
+        prepare_database(c)
+        idea=dict(_require(c,"SELECT * FROM content_ideas WHERE idea_id=:id",{"id":request.idea_id},"Idea not found"))
         if idea["status"]!="APPROVED": raise HTTPException(409,f"Only APPROVED ideas can enter scripting; current status is {idea['status']}")
-        existing=one(c,"SELECT script_id,version FROM content_scripts WHERE idea_id=:id ORDER BY version DESC LIMIT 1",{"id":request.idea_id}); version=(existing["version"]+1 if existing else 1); sid=str(uuid4()); now=datetime.now(timezone.utc).isoformat()
-        sections=[{"heading":"The setup","narration":f"Today we are breaking down {idea['topic']} and why it matters.","visual_notes":"Relevant source clips, screenshots or b-roll."},{"heading":"What is happening","narration":idea["hook"],"visual_notes":"Show evidence from the research source."},{"heading":"The important details","narration":idea["why_now"] or "Walk through the key facts and context.","visual_notes":"Use diagrams, captions and supporting visuals."},{"heading":"What to watch next","narration":idea["monetization_angle"] or "Close with the practical implication for the viewer.","visual_notes":"End card and next-video prompt."}]
-        _insert(c,"INSERT INTO content_scripts(script_id,idea_id,title,hook,sections_json,closing,fact_check_json,version,created_at) VALUES (:sid,:idea,:title,:hook,:sections,:closing,:facts,:version,:created)",{"sid":sid,"idea":request.idea_id,"title":idea["title"],"hook":idea["hook"],"sections":json.dumps(sections),"closing":"If this was useful, subscribe for the next breakdown.","facts":json.dumps(["Verify every factual claim against source evidence before publishing."]),"version":version,"created":now})
+        existing=one(c,"SELECT script_id,version FROM content_scripts WHERE idea_id=:id ORDER BY version DESC LIMIT 1",{"id":request.idea_id}); version=(existing["version"]+1 if existing else 1)
+        evidence=[{"title":idea["title"],"summary":idea.get("metadata_json") or "","source":idea.get("source"),"why_now":idea.get("why_now"),"research_url":None}]
+        try:
+            settings=get_settings()
+            if not settings.llm_provider:
+                raise RuntimeError("LLM provider is not configured")
+            generated=ScriptGenerator(get_llm_provider()).generate(idea=idea,evidence=evidence)
+        except Exception as exc:
+            raise HTTPException(502,f"Script generation failed: {type(exc).__name__}: {exc}") from exc
+        now=datetime.now(timezone.utc).isoformat(); sid=str(uuid4())
+        _insert(c,"INSERT INTO content_scripts(script_id,idea_id,title,hook,sections_json,closing,fact_check_json,version,created_at) VALUES (:sid,:idea,:title,:hook,:sections,:closing,:facts,:version,:created)",{"sid":sid,"idea":request.idea_id,"title":generated.title,"hook":generated.hook,"sections":json.dumps([s.model_dump() for s in generated.sections]),"closing":generated.closing,"facts":json.dumps(generated.fact_check_required),"version":version,"created":now})
         execute(c,"UPDATE content_ideas SET status='SCRIPTING' WHERE idea_id=:id",{"id":request.idea_id}); c.commit()
-        return {"script_id":sid,"idea_id":request.idea_id,"title":idea["title"],"hook":idea["hook"],"sections":sections,"closing":"If this was useful, subscribe for the next breakdown.","fact_check_required":["Verify every factual claim against source evidence before publishing."],"version":version}
+        return {"script_id":sid,"idea_id":request.idea_id,"title":generated.title,"hook":generated.hook,"sections":[s.model_dump() for s in generated.sections],"closing":generated.closing,"fact_check_required":generated.fact_check_required,"version":version}
     finally:c.close()
 
 @router.get("/production")
