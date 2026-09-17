@@ -1,9 +1,8 @@
-"""SQLite schema management for ContentOS V0.1."""
+"""Database schema shared by local SQLite and production PostgreSQL."""
 
 import sqlite3
 
-
-SCHEMA = """
+SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS content_ideas (
     idea_id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -23,16 +22,27 @@ CREATE TABLE IF NOT EXISTS content_ideas (
     metadata_json TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
-
-CREATE INDEX IF NOT EXISTS idx_content_ideas_status
-    ON content_ideas(status);
-
-CREATE INDEX IF NOT EXISTS idx_content_ideas_score
-    ON content_ideas(overall_score DESC);
+CREATE INDEX IF NOT EXISTS idx_content_ideas_status ON content_ideas(status);
+CREATE INDEX IF NOT EXISTS idx_content_ideas_score ON content_ideas(overall_score DESC);
 """
 
 
 def initialize_schema(connection: sqlite3.Connection) -> None:
-    """Create the ContentOS tables and indexes if they do not exist."""
-    connection.executescript(SCHEMA)
+    """Initialize the local SQLite database."""
+    connection.executescript(SCHEMA_SQL)
+    connection.commit()
+
+
+POSTGRES_SCHEMA_SQL = SCHEMA_SQL.replace(
+    "metadata_json TEXT NOT NULL", "metadata_json TEXT NOT NULL"
+)
+
+
+def initialize_postgres_schema(connection) -> None:
+    """Initialize the production PostgreSQL database."""
+    from sqlalchemy import text
+
+    statements = [statement.strip() for statement in POSTGRES_SCHEMA_SQL.split(";") if statement.strip()]
+    for statement in statements:
+        connection.execute(text(statement))
     connection.commit()
