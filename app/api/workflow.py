@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import json
 from uuid import uuid4
 
+from app.automation.scheduler import run_queued_jobs
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -264,6 +266,14 @@ def add_learning(request: LearningIn):
     try:
         prepare_database(c); sid=str(uuid4()); _insert(c,"INSERT INTO learning_signals(signal_id,source_video_id,signal_type,observation,confidence,created_at) VALUES (:id,:video,:type,:obs,:confidence,:created)",{"id":sid,"video":request.source_video_id,"type":request.signal_type,"obs":request.observation,"confidence":request.confidence,"created":datetime.now(timezone.utc).isoformat()}); return {"signal_id":sid,"status":"recorded"}
     finally: c.close()
+@router.post("/automation/run")
+def run_automation():
+    """Execute queued automation jobs synchronously within this invocation."""
+    if not get_settings().api_token:
+        raise HTTPException(503, "Automation execution requires CONTENTOS_API_TOKEN")
+    return run_queued_jobs({})
+
+
 @router.get("/automation")
 def automation():
     c=get_connection()
