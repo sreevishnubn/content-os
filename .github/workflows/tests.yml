@@ -27,6 +27,6 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Run tests
-        run: python -m pytest -q
+      - name: Run tests with diagnostics
+        run: python -m pytest -vv -s --tb=long -x --durations=20
         timeout-minutes: 8
