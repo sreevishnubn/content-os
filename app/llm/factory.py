@@ -13,7 +13,11 @@ def get_llm_provider() -> LLMProvider:
             raise RuntimeError("OPENROUTER_API_KEY is required when CONTENTOS_LLM_PROVIDER=openrouter")
         return OpenRouterProvider(
             api_key=settings.llm_api_key,
-            default_model=settings.llm_model or "openai/gpt-oss-20b",
+            default_model=(
+                "openai/gpt-oss-20b:free"
+                if settings.llm_model in {None, "openrouter/free"}
+                else settings.llm_model
+            ),
             site_url="https://dashboard.youtube.analysis.com",
             site_name="ContentOS",
         )
