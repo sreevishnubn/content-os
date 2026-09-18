@@ -87,6 +87,30 @@ Open:
 
 Read **[docs/REAL_INTEGRATIONS_GUIDE.md](docs/REAL_INTEGRATIONS_GUIDE.md)** for the complete setup of research, OpenAI, TTS, FFmpeg, YouTube OAuth, publishing, analytics and learning.
 
+## Production readiness
+
+The production path is split into two runtimes:
+
+- **Vercel:** FastAPI API, authentication, database access and lightweight queue orchestration.
+- **Worker:** TTS + FFmpeg rendering and artifact upload to S3-compatible object storage.
+
+A production render job requires approved asset URIs. The worker creates narration, renders MP4, uploads it to `CONTENTOS_ARTIFACT_BUCKET`, and marks the production job `READY`. The API then materializes the artifact only when YouTube needs to upload it.
+
+Required worker variables:
+
+```text
+OPENAI_API_KEY=<secret>
+CONTENTOS_TTS_MODEL=gpt-4o-mini-tts
+CONTENTOS_TTS_VOICE=alloy
+CONTENTOS_ARTIFACT_BUCKET=<private-bucket>
+CONTENTOS_ARTIFACT_PREFIX=contentos/renders
+AWS_ACCESS_KEY_ID=<secret>
+AWS_SECRET_ACCESS_KEY=<secret>
+AWS_DEFAULT_REGION=<region>
+```
+
+For local development, omit the bucket and ContentOS writes renders to `data/output`. Hosted production should use object storage.
+
 ## Production architecture
 
 ```text
