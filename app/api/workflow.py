@@ -25,7 +25,9 @@ from app.integrations.youtube_oauth import load_server_credentials
 router = APIRouter(prefix="/api/dashboard", dependencies=[Depends(require_api_token)])
 
 class ScriptDraftRequest(BaseModel): idea_id: str
-class ProductionRequest(BaseModel): script_id: str
+class ProductionRequest(BaseModel):
+    script_id: str
+    asset_uris: list[str] = Field(default_factory=list, max_length=50)
 class ProductionArtifactRequest(BaseModel): artifact_uri: str = Field(min_length=1, max_length=2000)
 class PublishRequestIn(BaseModel):
     production_id: str; title: str = Field(min_length=1, max_length=200); description: str = ""; tags: list[str] = Field(default_factory=list); scheduled_at: datetime | None = None
@@ -125,7 +127,7 @@ def create_production(request: ProductionRequest):
     c=get_connection()
     try:
         prepare_database(c); s=_require(c,"SELECT script_id FROM content_scripts WHERE script_id=:id",{"id":request.script_id},"Script not found"); pid=str(uuid4()); now=datetime.now(timezone.utc).isoformat()
-        _insert(c,"INSERT INTO production_jobs(production_id,script_id,status,asset_paths_json,output_path,error,created_at) VALUES (:id,:script,'QUEUED',:assets,NULL,NULL,:created)",{"id":pid,"script":s["script_id"],"assets":json.dumps([]),"created":now}); return {"production_id":pid,"script_id":s["script_id"],"status":"QUEUED"}
+        _insert(c,"INSERT INTO production_jobs(production_id,script_id,status,asset_paths_json,output_path,error,created_at) VALUES (:id,:script,'QUEUED',:assets,NULL,NULL,:created)",{"id":pid,"script":s["script_id"],"assets":json.dumps(request.asset_uris),"created":now}); return {"production_id":pid,"script_id":s["script_id"],"status":"QUEUED","assets":request.asset_uris}
     finally: c.close()
 
 @router.post("/production/{production_id}/artifact")
