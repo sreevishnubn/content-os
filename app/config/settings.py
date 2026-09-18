@@ -18,6 +18,7 @@ class Settings(BaseModel):
     cors_origins: list[str] = Field(default_factory=list)
     llm_provider: str | None = "openrouter"
     llm_model: str | None = "openrouter/free"
+    youtube_api_key: str | None = None
 
     @property
     def llm_api_key(self) -> str | None:
@@ -71,4 +72,5 @@ def get_settings() -> Settings:
         cors_origins=[item.strip() for item in origins.split(",") if item.strip()],
         llm_provider=os.getenv("CONTENTOS_LLM_PROVIDER") or "openrouter",
         llm_model=os.getenv("CONTENTOS_LLM_MODEL") or "openrouter/free",
+        youtube_api_key=os.getenv("YOUTUBE_API_KEY") or None,
     )
