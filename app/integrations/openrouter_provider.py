@@ -75,11 +75,38 @@ class OpenRouterProvider(LLMProvider):
             usage=self._usage(response),
         )
 
+    @staticmethod
+    def _strict_json_schema(response_model: type[BaseModel]) -> dict:
+        """Convert a Pydantic schema to the portable strict JSON Schema subset."""
+        raw = response_model.model_json_schema()
+        definitions = raw.get("$defs", {})
+
+        def transform(node: dict) -> dict:
+            if "$ref" in node:
+                ref_name = node["$ref"].rsplit("/", 1)[-1]
+                return transform(definitions[ref_name])
+
+            result = {}
+            node_type = node.get("type")
+            if node_type:
+                result["type"] = node_type
+            if "enum" in node:
+                result["enum"] = node["enum"]
+            if node_type == "object":
+                properties = node.get("properties", {})
+                result["properties"] = {name: transform(value) for name, value in properties.items()}
+                result["required"] = list(properties.keys())
+                result["additionalProperties"] = False
+            elif node_type == "array":
+                result["items"] = transform(node["items"])
+            return result
+
+        return transform(raw)
     def generate_structured(
         self, request: LLMRequest, response_model: type[T]
     ) -> StructuredLLMResponse[T]:
         """Generate structured data, including with free models that lack JSON-schema support."""
-        schema = response_model.model_json_schema()
+        schema = self._strict_json_schema(response_model)
 
         try:
             model, response = self._create(
@@ -94,30 +121,18 @@ class OpenRouterProvider(LLMProvider):
                     },
                 },
             )
-            content = response.choices[0].message.content
-            if content:
-                try:
-                    data = response_model.model_validate_json(content)
-                    return StructuredLLMResponse(
-                        data=data,
-                        provider=self.name,
-                        model=model,
-                        usage=self._usage(response),
-                    )
-                except ValueError:
-                    pass
-        except Exception:
-            pass
+        except Exception as exc:
+            raise ValueError(
+                f"OpenRouter free structured-output request failed for {response_model.__name__}: {exc}"
+            ) from exc
 
-        # The /free router is capability-aware: when response_format is
-        # json_schema, OpenRouter filters the free pool to providers that support
-        # structured outputs. Do not fall back to a fixed model or plain-text JSON,
-        # because that would violate the application's free + structured-only rule.
-        raise ValueError(
-            f"OpenRouter free structured-output request failed for {response_model.__name__}. "
-            "The free router could not return a schema-valid response."
-        )
-
+        content = response.choices[0].message.content or ""
+        try:
+            data = response_model.model_validate_json(content)
+        except ValueError as exc:
+            raise ValueError(
+                f"OpenRouter returned invalid structured output for {response_model.__name__}: {exc}"
+            ) from exc
 
         return StructuredLLMResponse(
             data=data,
