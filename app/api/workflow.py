@@ -15,6 +15,7 @@ from app.learning.engine import LearningEngine
 from app.llm.factory import get_llm_provider
 from app.scripts.generator import ScriptGenerator
 from pathlib import Path
+from app.integrations.artifacts import materialize_artifact
 from app.integrations.youtube import YouTubeProvider
 from app.integrations.youtube_oauth import load_server_credentials
 
@@ -187,18 +188,31 @@ def publish_to_youtube(publish_id: str, request: YouTubePublishRequest):
         if not record["output_path"]:
             raise HTTPException(409, "Production artifact is missing")
         artifact = str(record["output_path"])
-        if not Path(artifact).exists():
-            raise HTTPException(409, "The production artifact is not available to the server. Use a worker-accessible file path or object-storage mount.")
+        local_artifact = None
+        temporary_artifact = False
         try:
+            local_artifact, temporary_artifact = materialize_artifact(artifact)
             tags = json.loads(record["tags_json"] or "[]")
-            if not isinstance(tags, list): tags = []
+            if not isinstance(tags, list):
+                tags = []
             response = YouTubeProvider(credentials).upload_video(
-                artifact, title=record["title"], description=record["description"] or "",
-                tags=[str(tag) for tag in tags], privacy_status=request.privacy_status, category_id=request.category_id)
+                local_artifact,
+                title=record["title"],
+                description=record["description"] or "",
+                tags=[str(tag) for tag in tags],
+                privacy_status=request.privacy_status,
+                category_id=request.category_id,
+            )
             video_id = response.get("id")
-            if not video_id: raise RuntimeError("YouTube upload completed without returning a video ID")
+            if not video_id:
+                raise RuntimeError("YouTube upload completed without returning a video ID")
+        except FileNotFoundError as exc:
+            raise HTTPException(409, str(exc)) from exc
         except Exception as exc:
             raise HTTPException(502, f"YouTube upload failed: {type(exc).__name__}: {exc}") from exc
+        finally:
+            if temporary_artifact and local_artifact:
+                Path(local_artifact).unlink(missing_ok=True)
         _insert(c, "UPDATE publish_requests SET external_id=:external_id,status='PUBLISHED' WHERE publish_id=:id", {"external_id": video_id, "id": publish_id})
         return {
             "publish_id": publish_id, "status": "PUBLISHED", "external_id": video_id,
