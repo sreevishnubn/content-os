@@ -134,7 +134,7 @@ class OpenRouterProvider(LLMProvider):
             parts = cleaned.splitlines()
             if parts and parts[0].strip().startswith("```"):
                 parts = parts[1:]
-            if parts and parts[-1].strip() == "```"):
+            if parts and parts[-1].strip() == "```":
                 parts = parts[:-1]
             cleaned = "\n".join(parts).strip()
 
