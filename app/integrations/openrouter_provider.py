@@ -121,23 +121,49 @@ class OpenRouterProvider(LLMProvider):
             max_tokens=request.max_tokens,
             metadata=request.metadata,
         )
-        model, response = self._create(fallback_request)
+        # Free OpenRouter models do not all implement JSON-schema response formatting.
+        # Use JSON-object mode for the fallback.
+        model, response = self._create(
+            fallback_request,
+            response_format={"type": "json_object"},
+        )
         content = response.choices[0].message.content or ""
         cleaned = content.strip()
+
         if cleaned.startswith("```"):
-            lines = cleaned.splitlines()
-            if lines and lines[0].strip().startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            cleaned = "\n".join(lines).strip()
+            parts = cleaned.splitlines()
+            if parts and parts[0].strip().startswith("```"):
+                parts = parts[1:]
+            if parts and parts[-1].strip() == "```"):
+                parts = parts[:-1]
+            cleaned = "\n".join(parts).strip()
 
         try:
             data = response_model.model_validate_json(cleaned)
-        except ValueError as exc:
-            raise ValueError(
-                f"OpenRouter returned invalid structured output for {response_model.__name__}"
-            ) from exc
+        except ValueError:
+            decoder = json.JSONDecoder()
+            extracted = None
+            for index, char in enumerate(cleaned):
+                if char != "{":
+                    continue
+                try:
+                    candidate, _ = decoder.raw_decode(cleaned[index:])
+                    if isinstance(candidate, dict):
+                        extracted = candidate
+                        break
+                except json.JSONDecodeError:
+                    continue
+            if extracted is None:
+                raise ValueError(
+                    f"OpenRouter returned invalid structured output for {response_model.__name__}"
+                )
+            try:
+                data = response_model.model_validate(extracted)
+            except ValueError as exc:
+                raise ValueError(
+                    f"OpenRouter returned JSON that does not match {response_model.__name__}"
+                ) from exc
+
 
         return StructuredLLMResponse(
             data=data,
