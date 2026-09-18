@@ -16,7 +16,7 @@ from app.ideas.from_research import research_items_to_ideas
 from app.ideas.scorer import score_idea
 from app.research.engine import normalize_items
 from app.research.providers.youtube_resolver import resolve_channel_ids
-from app.research.providers.youtube_api import YouTubeAPIProvider
+from app.research.providers.youtube_rss import YouTubeRSSProvider
 from app.research.repository import ResearchRepository
 
 app = FastAPI(title="ContentOS API", version="1.1.1")
@@ -162,13 +162,7 @@ def research_youtube(request: YouTubeResearchRequest):
     except Exception as exc:
         raise HTTPException(422, f"Could not resolve channels: {exc}") from exc
 
-    if not settings.youtube_api_key:
-        raise HTTPException(
-            503,
-            "YouTube research is not configured. Set YOUTUBE_API_KEY in the Vercel environment.",
-        )
-
-    provider = YouTubeAPIProvider(settings.youtube_api_key, ids)
+    provider = YouTubeRSSProvider(ids)
     try:
         items = normalize_items(provider.search(request.query, limit=request.limit))
     except Exception as exc:
