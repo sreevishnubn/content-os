@@ -25,6 +25,7 @@ class ScriptGenerator:
             ),
             model=None,
             temperature=0.4,
+            max_tokens=1200,
         )
         generated = self.llm_provider.generate_structured(request, GeneratedScript).data
         return ContentScript(
