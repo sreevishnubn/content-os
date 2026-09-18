@@ -82,6 +82,43 @@ body.light .card,body.light .idea-card,body.light .script-card,body.light .row-c
  #nav::-webkit-scrollbar{display:none}
  #nav button{min-width:72px;flex:0 0 72px}
 }
+</style><style id="premium-ui">
+:root{--radius:16px;--shadow:0 12px 35px rgba(0,0,0,.22);--glow:0 0 0 1px rgba(244,197,66,.06),0 12px 35px rgba(0,0,0,.18)}
+body{background:radial-gradient(circle at 85% 0%,rgba(244,197,66,.055),transparent 28%),var(--bg);transition:background .35s ease,color .25s ease}
+.side{backdrop-filter:blur(18px);box-shadow:8px 0 35px rgba(0,0,0,.12);z-index:50}
+.brand{letter-spacing:-.04em}
+.brand:after{content:'CONTROL CENTER';display:block;font-size:8px;letter-spacing:.18em;color:var(--muted);font-weight:600;margin-top:5px}
+nav button{position:relative;transition:all .2s ease}
+nav button:after{content:'';position:absolute;left:4px;top:9px;bottom:9px;width:3px;border-radius:4px;background:var(--accent);transform:scaleY(0);transition:transform .2s ease}
+nav button:hover{transform:translateX(2px)}
+nav button.active{box-shadow:inset 0 0 0 1px var(--line),0 5px 18px rgba(0,0,0,.12)}
+nav button.active:after{transform:scaleY(1)}
+main{animation:pageIn .45s ease both}
+.page.active{animation:pageIn .35s ease both}
+@keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.card,.idea-card,.script-card,.row-card,.item,.stage{border-radius:var(--radius);box-shadow:var(--glow);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.card:hover,.idea-card:hover,.script-card:hover,.row-card:hover,.stage:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:rgba(244,197,66,.22)}
+.top{position:relative}
+.title{letter-spacing:-.045em;font-size:32px}
+.eyebrow{font-weight:700}
+.actions{align-items:center}
+.btn{border-radius:10px;min-height:40px;box-shadow:0 4px 12px rgba(0,0,0,.12);transition:transform .18s ease,box-shadow .18s ease,filter .18s ease}
+.btn:hover{filter:brightness(1.04);transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.18)}
+.btn:active{transform:translateY(0)}
+input,select,textarea{transition:border-color .2s,box-shadow .2s,background .2s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.table th{letter-spacing:.08em}
+.badge{font-weight:700}
+.status{padding:7px 11px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:12px}
+.status.good{box-shadow:0 0 18px rgba(67,209,122,.08)}
+.theme-toggle{width:auto!important;min-width:118px;justify-content:center;font-weight:800}
+#global-theme-toggle{position:fixed;right:24px;top:20px;z-index:100;backdrop-filter:blur(14px);background:var(--panel);border:1px solid var(--line)}
+#overview .grid .card{position:relative;overflow:hidden}
+#overview .grid .card:before{content:'';position:absolute;right:-28px;top:-28px;width:90px;height:90px;border-radius:50%;background:var(--accent-soft);filter:blur(4px)}
+.section{scroll-margin-top:20px}
+.light{--shadow:0 12px 35px rgba(15,23,42,.10);--glow:0 0 0 1px rgba(15,23,42,.02),0 10px 28px rgba(15,23,42,.08)}
+@media(max-width:900px){main{padding-right:20px}.title{font-size:29px}#global-theme-toggle{right:18px;top:14px}}
+@media(max-width:640px){main{padding-top:72px}.title{font-size:25px}#global-theme-toggle{top:8px;right:10px;min-width:105px}.side>.theme-toggle{display:none}.page.active{animation-duration:.25s}}
 </style></head>
 <body><div class="app"><aside class="side"><div class="brand">Content<span>OS</span></div><nav id="nav"><button class="active" data-page="overview">Overview</button><button data-page="research">Research</button><button data-page="ideas">Ideas</button><button data-page="review">Review Queue</button><button data-page="scripts">Scripts</button><button data-page="production">Production</button><button data-page="publishing">Publishing</button><button data-page="analytics">Analytics</button><button data-page="learning">Learning</button><button data-page="automation">Automation</button><button data-page="ai">AI / LLM</button><button data-page="settings">Settings</button></nav><button class="btn secondary theme-toggle" id="global-theme-toggle" onclick="toggleTheme()">☾ Dark / ☀ Light</button></aside><main>
 <section class="page active" id="overview"><div class="top"><div><div class="eyebrow">Control Center</div><div class="title">ContentOS Overview</div><div class="subtitle">Research → Ideas → Review → Scripts → Production → Publishing → Analytics → Learning</div></div><div id="system" class="status">● Connecting</div></div><div class="grid"><div class="card"><div class="muted">Research Items</div><div class="metric" id="o-research">—</div></div><div class="card"><div class="muted">Ideas</div><div class="metric" id="o-ideas">—</div></div><div class="card"><div class="muted">Approved</div><div class="metric" id="o-approved">—</div></div><div class="card"><div class="muted">Published</div><div class="metric" id="o-published">—</div></div></div><div class="section"><h2>Pipeline</h2><div class="pipeline"><div class="stage"><div class="num" id="p-research">—</div><div class="muted">Research</div></div><div class="stage"><div class="num" id="p-ideas">—</div><div class="muted">Ideas</div></div><div class="stage"><div class="num" id="p-review">—</div><div class="muted">Review</div></div><div class="stage"><div class="num" id="p-scripts">—</div><div class="muted">Scripts</div></div><div class="stage"><div class="num" id="p-production">—</div><div class="muted">Production</div></div><div class="stage"><div class="num" id="p-published">—</div><div class="muted">Published</div></div></div></div><div class="section"><h2>Top Opportunities</h2><table class="table"><thead><tr><th>Idea</th><th>Topic</th><th>Score</th><th>Status</th></tr></thead><tbody id="overview-table"></tbody></table></div></section>
