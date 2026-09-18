@@ -42,7 +42,7 @@ def _claim_job(connection, job_id: str) -> bool:
     result = execute(
         connection,
         """UPDATE automation_jobs
-           SET status='RUNNING', error=NULL
+           SET status='RUNNING', error=NULL, attempts=attempts+1
            WHERE job_id=:id AND status='QUEUED'""",
         {"id": job_id},
     )
@@ -104,7 +104,7 @@ def run_queued_jobs(handlers: dict[str, Callable[[dict], object]], limit: int = 
                     job_type=row["job_type"],
                     payload=payload,
                     status=JobStatus.RUNNING,
-                    attempts=int(row["attempts"]),
+                    attempts=int(row["attempts"])+1,
                 )
                 result = JobRunner(handlers).run(job)
                 execute(
