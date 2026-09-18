@@ -18,7 +18,7 @@ class OpenRouterProvider(LLMProvider):
     def __init__(
         self,
         api_key: str,
-        default_model: str = "openai/gpt-oss-20b",
+        default_model: str = "openrouter/free",
         site_url: str | None = None,
         site_name: str | None = None,
     ) -> None:
