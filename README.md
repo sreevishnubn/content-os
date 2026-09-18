@@ -10,6 +10,7 @@ The product is designed around a measurable feedback loop rather than a simple A
 
 The repository contains the software foundation for:
 
+- resilient YouTube research ingestion (YouTube Data API → yt-dlp → RSS fallback)
 - real RSS/Atom research ingestion
 - provider-independent LLM contracts
 - OpenAI structured generation adapter
@@ -142,6 +143,7 @@ CONTENTOS_LLM_PROVIDER=openai
 CONTENTOS_LLM_MODEL=gpt-5-mini
 OPENAI_API_KEY=<secret>
 CONTENTOS_RESEARCH_FEEDS=<comma-separated-feeds>
+YOUTUBE_API_KEY=<optional-official-youtube-data-api-key>
 CONTENTOS_TTS_PROVIDER=openai
 CONTENTOS_TTS_MODEL=gpt-4o-mini-tts
 CONTENTOS_TTS_VOICE=alloy
