@@ -5,6 +5,7 @@ import json
 from uuid import uuid4
 
 from app.automation.scheduler import run_queued_jobs
+from app.automation.handlers import HANDLERS
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -271,7 +272,7 @@ def run_automation():
     """Execute queued automation jobs synchronously within this invocation."""
     if not get_settings().api_token:
         raise HTTPException(503, "Automation execution requires CONTENTOS_API_TOKEN")
-    return run_queued_jobs({})
+    return run_queued_jobs(HANDLERS)
 
 
 @router.get("/automation")
