@@ -25,10 +25,17 @@ class YouTubeYTDLPProvider(ResearchProvider):
         if isinstance(value, datetime):
             result = value
         else:
-            try:
-                result = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-            except ValueError:
-                return None
+            text = str(value)
+            if len(text) == 8 and text.isdigit():
+                try:
+                    result = datetime.strptime(text, "%Y%m%d").replace(tzinfo=timezone.utc)
+                except ValueError:
+                    return None
+            else:
+                try:
+                    result = datetime.fromisoformat(text.replace("Z", "+00:00"))
+                except ValueError:
+                    return None
         if result.tzinfo is None:
             result = result.replace(tzinfo=timezone.utc)
         return result
