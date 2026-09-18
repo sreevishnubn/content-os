@@ -84,6 +84,7 @@ class OpenRouterProvider(LLMProvider):
         try:
             model, response = self._create(
                 request,
+                provider={"require_parameters": True},
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
@@ -108,61 +109,14 @@ class OpenRouterProvider(LLMProvider):
         except Exception:
             pass
 
-        fallback_request = LLMRequest(
-            system_prompt=(
-                request.system_prompt
-                + "\nReturn ONLY one valid JSON object. Do not use Markdown, code fences, comments, or explanatory text."
-                + "\nThe JSON must match this schema exactly:\n"
-                + json.dumps(schema, separators=(',', ':'))
-            ),
-            user_prompt=request.user_prompt,
-            model=request.model,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
-            metadata=request.metadata,
+        # The /free router is capability-aware: when response_format is
+        # json_schema, OpenRouter filters the free pool to providers that support
+        # structured outputs. Do not fall back to a fixed model or plain-text JSON,
+        # because that would violate the application's free + structured-only rule.
+        raise ValueError(
+            f"OpenRouter free structured-output request failed for {response_model.__name__}. "
+            "The free router could not return a schema-valid response."
         )
-        # Free OpenRouter models do not all implement JSON-schema response formatting.
-        # Use JSON-object mode for the fallback.
-        model, response = self._create(
-            fallback_request,
-            response_format={"type": "json_object"},
-        )
-        content = response.choices[0].message.content or ""
-        cleaned = content.strip()
-
-        if cleaned.startswith("```"):
-            parts = cleaned.splitlines()
-            if parts and parts[0].strip().startswith("```"):
-                parts = parts[1:]
-            if parts and parts[-1].strip() == "```":
-                parts = parts[:-1]
-            cleaned = "\n".join(parts).strip()
-
-        try:
-            data = response_model.model_validate_json(cleaned)
-        except ValueError:
-            decoder = json.JSONDecoder()
-            extracted = None
-            for index, char in enumerate(cleaned):
-                if char != "{":
-                    continue
-                try:
-                    candidate, _ = decoder.raw_decode(cleaned[index:])
-                    if isinstance(candidate, dict):
-                        extracted = candidate
-                        break
-                except json.JSONDecodeError:
-                    continue
-            if extracted is None:
-                raise ValueError(
-                    f"OpenRouter returned invalid structured output for {response_model.__name__}"
-                )
-            try:
-                data = response_model.model_validate(extracted)
-            except ValueError as exc:
-                raise ValueError(
-                    f"OpenRouter returned JSON that does not match {response_model.__name__}"
-                ) from exc
 
 
         return StructuredLLMResponse(
