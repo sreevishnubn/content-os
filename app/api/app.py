@@ -17,6 +17,9 @@ from app.ideas.scorer import score_idea
 from app.research.engine import normalize_items
 from app.research.providers.youtube_resolver import resolve_channel_ids
 from app.research.providers.youtube import YouTubeResilientProvider
+
+# Backwards-compatible provider symbol used by existing tests/integrations.
+YouTubeRSSProvider = YouTubeResilientProvider
 from app.research.repository import ResearchRepository
 
 app = FastAPI(title="ContentOS API", version="1.1.1")
@@ -162,7 +165,7 @@ def research_youtube(request: YouTubeResearchRequest):
     except Exception as exc:
         raise HTTPException(422, f"Could not resolve channels: {exc}") from exc
 
-    provider = YouTubeResilientProvider(ids)
+    provider = YouTubeRSSProvider(ids)
     try:
         items = normalize_items(provider.search(request.query, limit=request.limit))
     except Exception as exc:
@@ -176,7 +179,7 @@ def research_youtube(request: YouTubeResearchRequest):
         if ideas:
             _save_ideas(c, ideas)
         return {
-            "provider": provider.last_provider or provider.name,
+            "provider": getattr(provider, "last_provider", "") or provider.name,
             "channel_ids": ids,
             "research_items_found": len(items),
             "ideas_created": len(ideas),
