@@ -27,9 +27,9 @@ async function resetDemoData() {
     if (!confirm('Reset ContentOS demo data? This clears research, ideas, scripts, production, publishing, analytics, learning and automation records.')) return;
     try {
         await request('/admin/reset-demo', { method: 'POST' });
-        await showProduction();
-        if (typeof showOverview === 'function') await showOverview();
-        if (typeof showProduction === 'function') await showProduction();
+        // Reset the database, then navigate through the normal page router.
+        // Calling page renderers directly leaves previously active pages visible.
+        await show('overview');
     } catch (e) {
         alert(e.message);
     }
