@@ -1,11 +1,11 @@
 """Execution primitives for ContentOS automation jobs."""
 
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
 
 from app.automation.jobs import AutomationJob, JobStatus
-from app.api.common import execute, prepare_database, one
+from app.api.common import execute, prepare_database, rows
 from app.database.connection import get_connection
 
 
@@ -18,62 +18,56 @@ class JobRunner:
     def run(self, job: AutomationJob) -> AutomationJob:
         handler = self.handlers.get(job.job_type)
         if handler is None:
-            return job.model_copy(
-                update={
-                    "status": JobStatus.FAILED,
-                    "attempts": job.attempts + 1,
-                    "error": f"Unknown job type: {job.job_type}",
-                }
-            )
+            return job.model_copy(update={
+                "status": JobStatus.FAILED,
+                "attempts": job.attempts + 1,
+                "error": f"Unknown job type: {job.job_type}",
+            })
         try:
             handler(job.payload)
-            return job.model_copy(
-                update={"status": JobStatus.SUCCEEDED, "attempts": job.attempts + 1, "error": None}
-            )
+            return job.model_copy(update={
+                "status": JobStatus.SUCCEEDED,
+                "attempts": job.attempts,
+                "error": None,
+            })
         except Exception as exc:
-            return job.model_copy(
-                update={
-                    "status": JobStatus.FAILED,
-                    "attempts": job.attempts + 1,
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
-            )
+            return job.model_copy(update={
+                "status": JobStatus.FAILED,
+                "attempts": job.attempts,
+                "error": f"{type(exc).__name__}: {exc}",
+            })
 
 
 def _claim_job(connection, job_id: str) -> bool:
-    """Atomically move one queued job to RUNNING."""
     result = execute(
         connection,
         """UPDATE automation_jobs
-           SET status='RUNNING', attempts=attempts+1, error=NULL,
-               created_at=:started
+           SET status='RUNNING', error=NULL
            WHERE job_id=:id AND status='QUEUED'""",
-        {"id": job_id, "started": datetime.now(timezone.utc).isoformat()},
+        {"id": job_id},
     )
     connection.commit()
     return bool(result.rowcount)
 
 
 def _recover_stale_jobs(connection, timeout_minutes: int = 10) -> int:
-    """Return abandoned RUNNING jobs to QUEUED after a worker crash."""
-    cutoff = datetime.now(timezone.utc).timestamp() - timeout_minutes * 60
+    """Requeue jobs left RUNNING by a crashed serverless invocation."""
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
     recovered = 0
-    for row in connection.execute(
-        "SELECT job_id, created_at FROM automation_jobs WHERE status='RUNNING'"
-        if not hasattr(connection, "execute") or connection.__class__.__module__.startswith("sqlite")
-        else "SELECT job_id, created_at FROM automation_jobs WHERE status='RUNNING'"
-    ).fetchall():
-        raw = row[1] if not isinstance(row, dict) else row["created_at"]
+    for row in rows(connection, "SELECT job_id, created_at FROM automation_jobs WHERE status='RUNNING'"):
         try:
-            stamp = datetime.fromisoformat(str(raw).replace("Z", "+00:00")).timestamp()
+            stamp = datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00"))
         except (ValueError, TypeError):
             continue
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
         if stamp < cutoff:
-            job_id = row[0] if not isinstance(row, dict) else row["job_id"]
             result = execute(
                 connection,
-                "UPDATE automation_jobs SET status='QUEUED', error=:error WHERE job_id=:id AND status='RUNNING'",
-                {"id": job_id, "error": "Recovered after worker timeout; retrying."},
+                """UPDATE automation_jobs
+                   SET status='QUEUED', error=:error
+                   WHERE job_id=:id AND status='RUNNING'""",
+                {"id": row["job_id"], "error": "Recovered after worker timeout; retrying."},
             )
             recovered += result.rowcount or 0
     connection.commit()
@@ -86,47 +80,52 @@ def run_queued_jobs(handlers: dict[str, Callable[[dict], object]], limit: int = 
     connection = get_connection()
     try:
         prepare_database(connection)
-        _recover_stale_jobs(connection)
-        rows = connection.execute(
-            "SELECT job_id,job_type,payload_json,status,attempts,error,created_at "
-            "FROM automation_jobs WHERE status='QUEUED' ORDER BY created_at ASC LIMIT :limit"
-            if connection.__class__.__module__.startswith("sqlite")
-            else "SELECT job_id,job_type,payload_json,status,attempts,error,created_at "
-                 "FROM automation_jobs WHERE status='QUEUED' ORDER BY created_at ASC LIMIT :limit",
+        recovered = _recover_stale_jobs(connection)
+        queued = rows(
+            connection,
+            """SELECT job_id,job_type,payload_json,status,attempts,error,created_at
+               FROM automation_jobs
+               WHERE status='QUEUED'
+               ORDER BY created_at ASC
+               LIMIT :limit""",
             {"limit": limit},
-        ).fetchall()
+        )
         results = []
-        for row in rows:
-            data = dict(row)
-            job_id = data["job_id"]
+        for row in queued:
+            job_id = row["job_id"]
             if not _claim_job(connection, job_id):
                 continue
             try:
-                payload = json.loads(data["payload_json"] or "{}")
+                payload = json.loads(row["payload_json"] or "{}")
+                if not isinstance(payload, dict):
+                    raise ValueError("Automation payload must be a JSON object")
                 job = AutomationJob(
                     job_id=job_id,
-                    job_type=data["job_type"],
+                    job_type=row["job_type"],
                     payload=payload,
                     status=JobStatus.RUNNING,
-                    attempts=data["attempts"] + 1,
-                    error=None,
+                    attempts=int(row["attempts"]),
                 )
                 result = JobRunner(handlers).run(job)
                 execute(
                     connection,
-                    "UPDATE automation_jobs SET status=:status,error=:error WHERE job_id=:id",
-                    {"status": result.status.value, "error": result.error},
+                    """UPDATE automation_jobs
+                       SET status=:status,error=:error
+                       WHERE job_id=:id""",
+                    {"status": result.status.value, "error": result.error, "id": job_id},
                 )
                 connection.commit()
                 results.append(result.model_dump(mode="json"))
             except Exception as exc:
                 execute(
                     connection,
-                    "UPDATE automation_jobs SET status='FAILED',error=:error WHERE job_id=:id",
-                    {"status": "FAILED", "error": f"{type(exc).__name__}: {exc}", "id": job_id},
+                    """UPDATE automation_jobs
+                       SET status='FAILED',error=:error
+                       WHERE job_id=:id""",
+                    {"error": f"{type(exc).__name__}: {exc}", "id": job_id},
                 )
                 connection.commit()
                 results.append({"job_id": job_id, "status": "FAILED", "error": str(exc)})
-        return {"processed": len(results), "jobs": results}
+        return {"processed": len(results), "recovered": recovered, "jobs": results}
     finally:
         connection.close()
