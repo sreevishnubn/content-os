@@ -20,6 +20,7 @@ def test_resilient_provider_uses_ytdlp_without_api_key(monkeypatch):
     provider = YouTubeResilientProvider(["UC1234567890123456789012"])
     assert [name for name, _ in provider._providers()] == [
         "youtube_ytdlp",
+        "youtube_html",
         "youtube_rss",
     ]
 
@@ -30,6 +31,7 @@ def test_resilient_provider_puts_api_first_when_configured(monkeypatch):
     assert [name for name, _ in provider._providers()] == [
         "youtube_api",
         "youtube_ytdlp",
+        "youtube_html",
         "youtube_rss",
     ]
 
