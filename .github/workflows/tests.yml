@@ -12,6 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
@@ -28,3 +29,4 @@ jobs:
 
       - name: Run tests
         run: python -m pytest -q
+        timeout-minutes: 8
