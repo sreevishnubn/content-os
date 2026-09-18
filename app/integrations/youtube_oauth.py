@@ -33,3 +33,20 @@ def run_local_oauth(
     path.write_text(credentials.to_json(), encoding="utf-8")
     os.chmod(path, 0o600)
     return credentials
+
+def load_server_credentials() -> Credentials | None:
+    """Build YouTube OAuth credentials from server-side environment variables."""
+    client_id = os.getenv("YOUTUBE_CLIENT_ID", "").strip()
+    client_secret = os.getenv("YOUTUBE_CLIENT_SECRET", "").strip()
+    refresh_token = os.getenv("YOUTUBE_REFRESH_TOKEN", "").strip()
+    if not all((client_id, client_secret, refresh_token)):
+        return None
+
+    return Credentials(
+        token=None,
+        refresh_token=refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=client_id,
+        client_secret=client_secret,
+        scopes=SCOPES,
+    )
