@@ -14,6 +14,9 @@ from app.database.connection import get_connection, using_postgres
 from app.learning.engine import LearningEngine
 from app.llm.factory import get_llm_provider
 from app.scripts.generator import ScriptGenerator
+from pathlib import Path
+from app.integrations.youtube import YouTubeProvider
+from app.integrations.youtube_oauth import load_server_credentials
 
 router = APIRouter(prefix="/api/dashboard", dependencies=[Depends(require_api_token)])
 
@@ -24,6 +27,9 @@ class PublishRequestIn(BaseModel):
     production_id: str; title: str = Field(min_length=1, max_length=200); description: str = ""; tags: list[str] = Field(default_factory=list); scheduled_at: datetime | None = None
 class PublishStatusRequest(BaseModel):
     status: str; external_id: str | None = Field(default=None, min_length=1, max_length=200)
+class YouTubePublishRequest(BaseModel):
+    privacy_status: str = Field(default="private", pattern="^(private|unlisted|public)$")
+    category_id: str = Field(default="22", min_length=1, max_length=10)
 class StatusRequest(BaseModel): status: str
 class MetricsIn(BaseModel):
     external_video_id: str = Field(min_length=1, max_length=100); captured_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc)); views: int = Field(default=0, ge=0); watch_time_minutes: float = Field(default=0, ge=0); average_view_duration_seconds: float = Field(default=0, ge=0); impressions: int = Field(default=0, ge=0); click_through_rate: float = Field(default=0, ge=0, le=100); likes: int = Field(default=0, ge=0); comments: int = Field(default=0, ge=0); subscribers_gained: int = Field(default=0, ge=0); revenue: float = Field(default=0, ge=0)
@@ -159,6 +165,47 @@ def create_publish(request: PublishRequestIn):
         _insert(c,"INSERT INTO publish_requests(publish_id,production_id,title,description,tags_json,scheduled_at,status,external_id,created_at) VALUES (:id,:production,:title,:description,:tags,:scheduled,'DRAFT',NULL,:created)",{"id":pid,"production":request.production_id,"title":request.title.strip(),"description":request.description,"tags":json.dumps(request.tags),"scheduled":request.scheduled_at,"created":now}); return {"publish_id":pid,"status":"DRAFT"}
     finally: c.close()
 
+@router.post("/publishing/{publish_id}/youtube")
+def publish_to_youtube(publish_id: str, request: YouTubePublishRequest):
+    """Upload a READY production artifact to YouTube and persist its video ID."""
+    credentials = load_server_credentials()
+    if credentials is None:
+        raise HTTPException(503, "YouTube publishing is not configured. Set YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET and YOUTUBE_REFRESH_TOKEN on the server.")
+    c = get_connection()
+    try:
+        prepare_database(c)
+        record = _require(c,
+            "SELECT p.publish_id,p.production_id,p.title,p.description,p.tags_json,p.status,p.external_id,j.output_path FROM publish_requests p JOIN production_jobs j ON j.production_id=p.production_id WHERE p.publish_id=:id",
+            {"id": publish_id}, "publish_requests record not found")
+        if record["status"] == "PUBLISHED":
+            return {
+                "publish_id": publish_id, "status": "PUBLISHED", "external_id": record["external_id"],
+                "youtube_url": "https://www.youtube.com/watch?v=" + str(record["external_id"])
+            }
+        if record["status"] != "DRAFT":
+            raise HTTPException(409, "Only DRAFT publish records can be uploaded to YouTube")
+        if not record["output_path"]:
+            raise HTTPException(409, "Production artifact is missing")
+        artifact = str(record["output_path"])
+        if not Path(artifact).exists():
+            raise HTTPException(409, "The production artifact is not available to the server. Use a worker-accessible file path or object-storage mount.")
+        try:
+            tags = json.loads(record["tags_json"] or "[]")
+            if not isinstance(tags, list): tags = []
+            response = YouTubeProvider(credentials).upload_video(
+                artifact, title=record["title"], description=record["description"] or "",
+                tags=[str(tag) for tag in tags], privacy_status=request.privacy_status, category_id=request.category_id)
+            video_id = response.get("id")
+            if not video_id: raise RuntimeError("YouTube upload completed without returning a video ID")
+        except Exception as exc:
+            raise HTTPException(502, f"YouTube upload failed: {type(exc).__name__}: {exc}") from exc
+        _insert(c, "UPDATE publish_requests SET external_id=:external_id,status='PUBLISHED' WHERE publish_id=:id", {"external_id": video_id, "id": publish_id})
+        return {
+            "publish_id": publish_id, "status": "PUBLISHED", "external_id": video_id,
+            "youtube_url": "https://www.youtube.com/watch?v=" + str(video_id)
+        }
+    finally:
+        c.close()
 @router.patch("/publishing/{publish_id}/status")
 def publish_status(publish_id: str, request: PublishStatusRequest):
     c=get_connection()
