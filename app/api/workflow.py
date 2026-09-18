@@ -40,13 +40,22 @@ def _require(c, sql, p, message):
     return r
 
 
+def _validate_status_transition(current_status, status, allowed):
+    if status not in allowed:
+        raise HTTPException(422, "Invalid status")
+    if status == current_status:
+        return
+    transitions = {"DRAFT":{"SCHEDULED","FAILED"},"SCHEDULED":{"PUBLISHED","FAILED","DRAFT"},"PUBLISHED":set(),"FAILED":{"DRAFT","QUEUED"},"QUEUED":{"ASSETS","FAILED"},"ASSETS":{"RENDERING","FAILED"},"RENDERING":{"READY","FAILED"},"READY":set(),"RUNNING":{"SUCCEEDED","FAILED"},"SUCCEEDED":set()}
+    if status not in transitions.get(current_status, set()):
+        raise HTTPException(409, f"Invalid transition: {current_status} -> {status}")
+
+
 def _set_status(c, table, key, keycol, status, allowed):
-    if status not in allowed: raise HTTPException(422, "Invalid status")
     current = _require(c, f"SELECT status FROM {table} WHERE {keycol}=:id", {"id": key}, f"{table} record not found")
     current_status = current["status"]
-    if status == current_status: return current_status
-    transitions = {"DRAFT":{"SCHEDULED","FAILED"},"SCHEDULED":{"PUBLISHED","FAILED","DRAFT"},"PUBLISHED":set(),"FAILED":{"DRAFT","QUEUED"},"QUEUED":{"ASSETS","FAILED"},"ASSETS":{"RENDERING","FAILED"},"RENDERING":{"READY","FAILED"},"READY":set(),"RUNNING":{"SUCCEEDED","FAILED"},"SUCCEEDED":set()}
-    if status not in transitions.get(current_status, set()): raise HTTPException(409, f"Invalid transition: {current_status} -> {status}")
+    _validate_status_transition(current_status, status, allowed)
+    if status == current_status:
+        return current_status
     _insert(c, f"UPDATE {table} SET status=:status WHERE {keycol}=:id", {"status": status, "id": key})
     return status
 
@@ -126,10 +135,11 @@ def production_status(production_id: str, request: StatusRequest):
         prepare_database(c)
         job=_require(c,"SELECT status,output_path FROM production_jobs WHERE production_id=:id",{"id":production_id},"production_jobs record not found")
         # Validate the lifecycle transition before checking status-specific
-        # prerequisites, so an invalid jump reports the actual state-machine error.
-        status=_set_status(c,"production_jobs",production_id,"production_id",request.status,{"QUEUED","ASSETS","RENDERING","READY","FAILED"})
+        # prerequisites, without mutating the row until all prerequisites pass.
+        _validate_status_transition(job["status"], request.status, {"QUEUED","ASSETS","RENDERING","READY","FAILED"})
         if request.status == "READY" and not job["output_path"]:
             raise HTTPException(409,"Production cannot become READY until an artifact is registered")
+        status=_set_status(c,"production_jobs",production_id,"production_id",request.status,{"QUEUED","ASSETS","RENDERING","READY","FAILED"})
         return {"production_id":production_id,"status":status}
     finally: c.close()
 
