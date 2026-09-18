@@ -1,3 +1,4 @@
+/* ContentOS dashboard deployment trigger: latest UI from master */
 const DEFAULT_API_ROOT='https://content-os-flax.vercel.app';
 const API_ROOT=(localStorage.getItem('contentos_api_root')||window.CONTENTOS_API_BASE||DEFAULT_API_ROOT).replace(/\/$/,'');
 const API_BASE=window.CONTENTOS_DASHBOARD_API_BASE||`${API_ROOT}/api/dashboard`;
