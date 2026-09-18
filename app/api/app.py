@@ -21,6 +21,7 @@ from app.research.providers.youtube import YouTubeResilientProvider
 # Backwards-compatible provider symbol used by existing tests/integrations.
 YouTubeRSSProvider = YouTubeResilientProvider
 from app.research.repository import ResearchRepository
+from app.automation.scheduler import run_queued_jobs
 
 app = FastAPI(title="ContentOS API", version="1.1.1")
 settings = get_settings()
@@ -303,6 +304,16 @@ def bootstrap_database():
 from app.api.workflow import router as workflow_router
 
 app.include_router(workflow_router)
+
+@app.post("/api/cron/automation")
+def cron_automation(authorization: str | None = None):
+    """Vercel cron entrypoint; protected by CRON_SECRET or the API token."""
+    import os
+    secret = os.getenv("CRON_SECRET") or get_settings().api_token
+    if not secret or authorization != f"Bearer {secret}":
+        raise HTTPException(401, "Invalid cron authorization")
+    return run_queued_jobs({})
+
 
 # Static dashboard must be mounted LAST so /api/* and /health remain API routes.
 # FastAPI/Starlette has no app.frontend() helper; use StaticFiles explicitly.
