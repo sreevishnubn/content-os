@@ -108,17 +108,27 @@ class OpenRouterProvider(LLMProvider):
         """Generate schema-validated structured data through OpenRouter free routing."""
         schema = self._strict_json_schema(response_model)
 
+        # The free router can expose free endpoints that support JSON mode
+        # without exposing native JSON Schema. JSON mode still guarantees valid
+        # JSON, while ContentOS performs the final Pydantic schema validation.
+        structured_request = LLMRequest(
+            system_prompt=(
+                request.system_prompt
+                + "\nReturn ONLY one JSON object. No Markdown, code fences, comments, or prose."
+                + "\nThe JSON object must match this schema exactly:\n"
+                + json.dumps(schema, separators=(",", ":"))
+            ),
+            user_prompt=request.user_prompt,
+            model=request.model,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            metadata=request.metadata,
+        )
         try:
             model, response = self._create(
-                request,
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": response_model.__name__,
-                        "strict": True,
-                        "schema": schema,
-                    },
-                },
+                structured_request,
+                extra_body={"provider": {"require_parameters": True}},
+                response_format={"type": "json_object"},
             )
         except Exception as exc:
             raise ValueError(
@@ -130,7 +140,7 @@ class OpenRouterProvider(LLMProvider):
             data = response_model.model_validate_json(content)
         except ValueError as exc:
             raise ValueError(
-                f"OpenRouter returned invalid structured output for {response_model.__name__}: {exc}"
+                f"OpenRouter returned JSON that does not match {response_model.__name__}: {exc}"
             ) from exc
 
         return StructuredLLMResponse(
