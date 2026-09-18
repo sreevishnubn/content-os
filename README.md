@@ -112,7 +112,7 @@ Worker/compute
   └── analytics ingestion
 ```
 
-SQLite is for local development. Production persistence must use a hosted PostgreSQL database through `DATABASE_URL`. Video rendering should run on worker/compute infrastructure rather than inside a Vercel request.
+SQLite is for local development. Production persistence must use a hosted PostgreSQL database through `DATABASE_URL`. Video rendering should run on worker/compute infrastructure rather than inside a Vercel request. The worker should register the resulting MP4 as an HTTPS or s3:// artifact URI; the publishing API materializes that artifact temporarily for YouTube upload.
 
 ## Production database
 
@@ -139,9 +139,9 @@ CONTENTOS_ENVIRONMENT=production
 DATABASE_URL=<managed-postgresql-url>
 CONTENTOS_API_TOKEN=<long-random-secret>
 CONTENTOS_CORS_ORIGINS=https://sreevishnubn.github.io,https://dashboard.youtube.analysis.com
-CONTENTOS_LLM_PROVIDER=openai
-CONTENTOS_LLM_MODEL=gpt-5-mini
-OPENAI_API_KEY=<secret>
+CONTENTOS_LLM_PROVIDER=openrouter
+CONTENTOS_LLM_MODEL=openrouter/free
+OPENROUTER_API_KEY=<secret>
 CONTENTOS_RESEARCH_FEEDS=<comma-separated-feeds>
 YOUTUBE_API_KEY=<optional-official-youtube-data-api-key>
 CONTENTOS_TTS_PROVIDER=openai
