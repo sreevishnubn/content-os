@@ -42,8 +42,10 @@ def test_openrouter_structured_output(monkeypatch):
 
     class FakeCompletions:
         def create(self, **kwargs):
-            schema = kwargs["response_format"]["json_schema"]["schema"]
-            assert schema["properties"]["ok"]["type"] == "boolean"
+            assert kwargs["response_format"] == {"type": "json_object"}
+            assert kwargs["extra_body"]["provider"]["require_parameters"] is True
+            assert "Return ONLY one JSON object" in kwargs["messages"][0]["content"]
+            assert '"properties":{"ok":{"type":"boolean"}}' in kwargs["messages"][0]["content"]
             return SimpleNamespace(
                 choices=[SimpleNamespace(message=SimpleNamespace(content='{"ok":true}'))],
                 usage=None,
