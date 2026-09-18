@@ -1,6 +1,62 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ContentOS — Control Center</title>
 <style>:root{--bg:#080a0f;--side:#0b0e14;--panel:#10131a;--panel2:#151923;--line:#252b38;--text:#f4f6fb;--muted:#8e98aa;--accent:#f4c542;--good:#43d17a;--bad:#ff6b6b}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,system-ui,sans-serif}button,input,select,textarea{font:inherit}input,select,textarea{width:100%;background:#0b0e14;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px}textarea{min-height:90px}label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}.app{min-height:100vh}.side{width:240px;background:var(--side);border-right:1px solid var(--line);position:fixed;inset:0 auto 0 0;padding:22px 14px;overflow:auto}.brand{font-size:21px;font-weight:800;padding:4px 12px 25px}.brand span{color:var(--accent)}nav button{width:100%;display:block;border:0;background:transparent;color:var(--muted);text-align:left;padding:11px 12px;border-radius:8px;cursor:pointer;margin:2px 0}nav button:hover,nav button.active{background:var(--panel2);color:var(--text)}main{margin-left:240px;padding:30px 36px}.page{display:none}.page.active{display:block}.top{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:24px}.eyebrow{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em}.title{font-size:29px;font-weight:750;margin-top:5px}.subtitle{color:var(--muted);margin-top:7px}.actions{display:flex;gap:8px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card,.idea-card,.script-card,.row-card,.item{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}.metric{font-size:29px;font-weight:750;margin-top:8px}.muted{color:var(--muted)}.section{margin-top:24px}.section h2,.card h2{font-size:16px;margin:0 0 12px}.pipeline{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}.stage{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}.num{font-size:20px;font-weight:700}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:12px;border-bottom:1px solid var(--line);text-align:left}.table th{color:var(--muted);font-size:11px;text-transform:uppercase}.score{color:var(--accent);font-weight:700}.badge{display:inline-block;padding:4px 8px;border:1px solid var(--line);background:var(--panel2);border-radius:999px;font-size:11px}.btn{border:0;border-radius:7px;padding:9px 13px;background:var(--accent);color:#111;font-weight:700;cursor:pointer}.btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}.btn.danger{background:#321718;color:#ffb2b2;border:1px solid #5a2828}.btn:disabled{opacity:.6}.form-grid{display:grid;grid-template-columns:2fr 1fr 120px;gap:12px}.channel-list,.idea-actions,.mini-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.chip{padding:8px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel2)}.chip small{display:block;color:var(--muted)}.chip.good{border-color:#27553a}.chip.bad{border-color:#5a2828}.idea-head{display:flex;justify-content:space-between;gap:16px}.idea-title{font-size:17px;font-weight:750}.score-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0}.score-box{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px}.score-box strong{display:block;font-size:16px;margin-top:4px}.review-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.review-column{min-height:250px}.column-head{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:8px}.mini-idea{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:12px;margin:8px 0}.empty{padding:28px;text-align:center;border:1px dashed var(--line);border-radius:10px;color:var(--muted)}.notice,.connection{padding:13px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;margin-top:12px}.error{color:var(--bad);margin-top:10px}.success{color:var(--good);margin-top:10px}.link{color:var(--accent)}details{border-top:1px solid var(--line);padding:10px 0}summary{cursor:pointer;font-weight:700}.row-card{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.row-card .mini-actions{margin:0}.production-card{align-items:flex-start}.production-actions{min-width:260px;justify-content:flex-end}.production-artifact{display:flex;gap:7px;align-items:center;min-width:360px}.production-artifact input{min-width:240px}.connection{display:flex;align-items:center;gap:10px}.dot{width:10px;height:10px;border-radius:50%;background:var(--muted)}.dot.good{background:var(--good)}.dot.bad{background:var(--bad)}@media(max-width:900px){.side{width:70px}.brand{font-size:0}.brand span{font-size:20px}nav button{font-size:0}nav button:before{content:'•';font-size:18px}main{margin-left:70px;padding:20px}.grid,.review-grid{grid-template-columns:repeat(2,1fr)}.pipeline{grid-template-columns:repeat(3,1fr)}.form-grid{grid-template-columns:1fr}.score-grid{grid-template-columns:repeat(2,1fr)}.production-actions,.production-artifact{min-width:0;flex-wrap:wrap}}@media(max-width:560px){.grid,.review-grid,.pipeline{grid-template-columns:1fr}.top,.row-card{flex-direction:column}}
+</style><style id="responsive-overrides">
+html,body{width:100%;overflow-x:hidden}
+main{min-width:0}
+.top>div{min-width:0}
+.subtitle,.title{overflow-wrap:anywhere}
+.table-wrap{width:100%;overflow-x:auto}
+.table{min-width:620px}
+.card,.idea-card,.script-card,.row-card,.item{min-width:0}
+.row-card>div:first-child{min-width:0;flex:1}
+.row-card strong,.production-artifact input{overflow-wrap:anywhere}
+.btn{white-space:nowrap}
+@media(max-width:900px){
+  .side{width:76px;padding:18px 8px}
+  .brand{padding:4px 8px 20px;text-align:center}
+  nav button{padding:11px 8px;text-align:center}
+  nav button:before{display:none}
+  main{margin-left:76px;padding:20px 18px}
+  .top{align-items:stretch;flex-direction:column}
+  .actions{flex-wrap:wrap}
+  .actions .btn,.actions select{flex:1 1 140px}
+  .form-grid{grid-template-columns:1fr!important}
+  .production-card{align-items:stretch}
+  .production-actions{width:100%;justify-content:flex-start}
+  .production-artifact{width:100%;min-width:0}
+  .production-artifact input{min-width:0;flex:1}
+}
+@media(max-width:640px){
+  .side{position:fixed;width:100%;height:58px;inset:auto 0 0;padding:5px 4px;border-right:0;border-top:1px solid var(--line);z-index:20}
+  .brand{display:none}
+  nav{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;height:48px}
+  nav button{font-size:9px;line-height:1.1;padding:6px 2px;margin:0;overflow:hidden}
+  nav button:before{display:block;content:"•";font-size:14px}
+  main{margin-left:0;padding:16px 12px 76px}
+  .title{font-size:24px}
+  .subtitle{line-height:1.4}
+  .grid{grid-template-columns:repeat(2,1fr)}
+  .metric{font-size:24px}
+  .pipeline{grid-template-columns:repeat(2,1fr)}
+  .review-grid{grid-template-columns:1fr}
+  .score-grid{grid-template-columns:repeat(2,1fr)}
+  .idea-head{flex-direction:column}
+  .idea-actions,.mini-actions{width:100%}
+  .idea-actions .btn,.mini-actions .btn{flex:1 1 110px}
+  .row-card{flex-direction:column;align-items:stretch}
+  .row-card>.badge{align-self:flex-start}
+  .production-artifact{flex-direction:column;align-items:stretch}
+  .production-artifact input{width:100%}
+  .top .btn{width:100%}
+  .table-wrap{overflow-x:auto}
+  input,select,textarea{font-size:16px}
+}
+@media(max-width:390px){
+  .grid,.pipeline{grid-template-columns:1fr}
+  main{padding-left:10px;padding-right:10px}
+  nav button{font-size:8px}
+}
 </style></head>
 <body><div class="app"><aside class="side"><div class="brand">Content<span>OS</span></div><nav id="nav"><button class="active" data-page="overview">Overview</button><button data-page="research">Research</button><button data-page="ideas">Ideas</button><button data-page="review">Review Queue</button><button data-page="scripts">Scripts</button><button data-page="production">Production</button><button data-page="publishing">Publishing</button><button data-page="analytics">Analytics</button><button data-page="learning">Learning</button><button data-page="automation">Automation</button><button data-page="ai">AI / LLM</button><button data-page="settings">Settings</button></nav></aside><main>
 <section class="page active" id="overview"><div class="top"><div><div class="eyebrow">Control Center</div><div class="title">ContentOS Overview</div><div class="subtitle">Research → Ideas → Review → Scripts → Production → Publishing → Analytics → Learning</div></div><div id="system" class="status">● Connecting</div></div><div class="grid"><div class="card"><div class="muted">Research Items</div><div class="metric" id="o-research">—</div></div><div class="card"><div class="muted">Ideas</div><div class="metric" id="o-ideas">—</div></div><div class="card"><div class="muted">Approved</div><div class="metric" id="o-approved">—</div></div><div class="card"><div class="muted">Published</div><div class="metric" id="o-published">—</div></div></div><div class="section"><h2>Pipeline</h2><div class="pipeline"><div class="stage"><div class="num" id="p-research">—</div><div class="muted">Research</div></div><div class="stage"><div class="num" id="p-ideas">—</div><div class="muted">Ideas</div></div><div class="stage"><div class="num" id="p-review">—</div><div class="muted">Review</div></div><div class="stage"><div class="num" id="p-scripts">—</div><div class="muted">Scripts</div></div><div class="stage"><div class="num" id="p-production">—</div><div class="muted">Production</div></div><div class="stage"><div class="num" id="p-published">—</div><div class="muted">Published</div></div></div></div><div class="section"><h2>Top Opportunities</h2><table class="table"><thead><tr><th>Idea</th><th>Topic</th><th>Score</th><th>Status</th></tr></thead><tbody id="overview-table"></tbody></table></div></section>
