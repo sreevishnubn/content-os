@@ -64,7 +64,7 @@ def get_settings() -> Settings:
         database_path = "/tmp/content.db" if os.getenv("VERCEL") else "data/content.db"
 
     return Settings(
-        environment=os.getenv("CONTENTOS_ENVIRONMENT", "development"),
+        environment=os.getenv("CONTENTOS_ENVIRONMENT") or ("production" if os.getenv("VERCEL") else "development"),
         database_url=os.getenv("DATABASE_URL") or None,
         database_path=database_path,
         api_token=os.getenv("CONTENTOS_API_TOKEN") or None,
