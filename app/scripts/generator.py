@@ -21,11 +21,11 @@ class ScriptGenerator:
                 f"{idea}\n\n"
                 "Research evidence:\n"
                 f"{evidence}\n\n"
-                "Create a strong hook, logical sections, visual notes, closing and fact-check list."
+                "Create a strong hook, 4-6 concise sections, concise visual notes, a closing and fact-check list. Keep the total response compact enough to fit the requested output limit."
             ),
             model=None,
             temperature=0.4,
-            max_tokens=1200,
+            max_tokens=3000,
         )
         generated = self.llm_provider.generate_structured(request, GeneratedScript).data
         return ContentScript(
