@@ -78,27 +78,67 @@ class OpenRouterProvider(LLMProvider):
     def generate_structured(
         self, request: LLMRequest, response_model: type[T]
     ) -> StructuredLLMResponse[T]:
+        """Generate structured data, including with free models that lack JSON-schema support."""
         schema = response_model.model_json_schema()
-        model, response = self._create(
-            request,
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": response_model.__name__,
-                    "strict": True,
-                    "schema": schema,
-                },
-            },
-        )
-        content = response.choices[0].message.content
-        if not content:
-            raise ValueError("OpenRouter returned no structured output")
+
         try:
-            data = response_model.model_validate(json.loads(content))
-        except (json.JSONDecodeError, ValueError) as exc:
+            model, response = self._create(
+                request,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": response_model.__name__,
+                        "strict": True,
+                        "schema": schema,
+                    },
+                },
+            )
+            content = response.choices[0].message.content
+            if content:
+                try:
+                    data = response_model.model_validate_json(content)
+                    return StructuredLLMResponse(
+                        data=data,
+                        provider=self.name,
+                        model=model,
+                        usage=self._usage(response),
+                    )
+                except ValueError:
+                    pass
+        except Exception:
+            pass
+
+        fallback_request = LLMRequest(
+            system_prompt=(
+                request.system_prompt
+                + "\nReturn ONLY one valid JSON object. Do not use Markdown, code fences, comments, or explanatory text."
+                + "\nThe JSON must match this schema exactly:\n"
+                + json.dumps(schema, separators=(',', ':'))
+            ),
+            user_prompt=request.user_prompt,
+            model=request.model,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            metadata=request.metadata,
+        )
+        model, response = self._create(fallback_request)
+        content = response.choices[0].message.content or ""
+        cleaned = content.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if lines and lines[0].strip().startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            cleaned = "\n".join(lines).strip()
+
+        try:
+            data = response_model.model_validate_json(cleaned)
+        except ValueError as exc:
             raise ValueError(
                 f"OpenRouter returned invalid structured output for {response_model.__name__}"
             ) from exc
+
         return StructuredLLMResponse(
             data=data,
             provider=self.name,
