@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -306,7 +306,7 @@ from app.api.workflow import router as workflow_router
 app.include_router(workflow_router)
 
 @app.post("/api/cron/automation")
-def cron_automation(authorization: str | None = None):
+def cron_automation(authorization: str | None = Header(default=None)):
     """Vercel cron entrypoint; protected by CRON_SECRET or the API token."""
     import os
     secret = os.getenv("CRON_SECRET") or get_settings().api_token
