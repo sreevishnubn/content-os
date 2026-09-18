@@ -111,7 +111,7 @@ class OpenRouterProvider(LLMProvider):
         try:
             model, response = self._create(
                 request,
-                provider={"require_parameters": True},
+                extra_body={"provider": {"require_parameters": True}},
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
