@@ -125,9 +125,11 @@ def production_status(production_id: str, request: StatusRequest):
     try:
         prepare_database(c)
         job=_require(c,"SELECT status,output_path FROM production_jobs WHERE production_id=:id",{"id":production_id},"production_jobs record not found")
+        # Validate the lifecycle transition before checking status-specific
+        # prerequisites, so an invalid jump reports the actual state-machine error.
+        status=_set_status(c,"production_jobs",production_id,"production_id",request.status,{"QUEUED","ASSETS","RENDERING","READY","FAILED"})
         if request.status == "READY" and not job["output_path"]:
             raise HTTPException(409,"Production cannot become READY until an artifact is registered")
-        status=_set_status(c,"production_jobs",production_id,"production_id",request.status,{"QUEUED","ASSETS","RENDERING","READY","FAILED"})
         return {"production_id":production_id,"status":status}
     finally: c.close()
 
