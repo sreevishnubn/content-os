@@ -19,6 +19,7 @@ from app.research.models import ResearchItem
 from app.research.providers.youtube_api import YouTubeAPIProvider
 from app.research.providers.youtube_rss import YouTubeRSSProvider
 from app.research.providers.youtube_ytdlp import YouTubeYTDLPProvider
+from app.research.providers.youtube_html import YouTubeHTMLProvider
 
 
 class YouTubeResilientProvider(ResearchProvider):
@@ -51,6 +52,15 @@ class YouTubeResilientProvider(ResearchProvider):
             (
                 "youtube_ytdlp",
                 lambda: YouTubeYTDLPProvider(
+                    self.channel_ids,
+                    timeout=self.timeout,
+                ),
+            )
+        )
+        providers.append(
+            (
+                "youtube_html",
+                lambda: YouTubeHTMLProvider(
                     self.channel_ids,
                     timeout=self.timeout,
                 ),
