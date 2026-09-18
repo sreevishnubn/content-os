@@ -105,13 +105,12 @@ class OpenRouterProvider(LLMProvider):
     def generate_structured(
         self, request: LLMRequest, response_model: type[T]
     ) -> StructuredLLMResponse[T]:
-        """Generate structured data, including with free models that lack JSON-schema support."""
+        """Generate schema-validated structured data through OpenRouter free routing."""
         schema = self._strict_json_schema(response_model)
 
         try:
             model, response = self._create(
                 request,
-                extra_body={"provider": {"require_parameters": True}},
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
