@@ -14,7 +14,7 @@ def get_llm_provider() -> LLMProvider:
         return OpenRouterProvider(
             api_key=settings.llm_api_key,
             default_model=(
-                "openrouter/free"
+                "openai/gpt-oss-20b:free"
                 if settings.llm_model in {None, "openrouter/free"}
                 else settings.llm_model
             ),
