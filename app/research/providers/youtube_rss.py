@@ -8,7 +8,8 @@ items. It deliberately does not scrape search pages or require a login.
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from urllib.parse import quote
-from urllib.request import Request, urlopen
+from urllib.request import HTTPError, Request, urlopen
+import time
 import xml.etree.ElementTree as ET
 
 from app.research.interface import ResearchProvider
@@ -77,10 +78,42 @@ class YouTubeRSSProvider(ResearchProvider):
         """Return recent uploads whose title/description matches query when supplied."""
         results: list[ResearchItem] = []
         for channel_id in self.channel_ids:
-            url = f"https://www.youtube.com/feeds/videos.xml?channel_id={quote(channel_id, safe='')}"
-            request = Request(url, headers={"User-Agent": "ContentOS/1.0"})
-            with urlopen(request, timeout=self.timeout) as response:
-                xml_text = response.read().decode("utf-8")
+            base_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={quote(channel_id, safe='')}"
+            last_error: Exception | None = None
+            xml_text: str | None = None
+
+            # YouTube's public RSS endpoint has documented intermittent 404/500
+            # responses. Retry briefly and add a cache-busting query parameter so
+            # a transient edge-cache failure is not treated as a dead channel.
+            for attempt in range(3):
+                url = f"{base_url}&_contentos={int(time.time() * 1000)}"
+                request = Request(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (compatible; ContentOS/1.0; +https://dashboard.youtube.analysis.com)",
+                        "Accept": "application/atom+xml,application/xml,text/xml;q=0.9,*/*;q=0.8",
+                        "Cache-Control": "no-cache",
+                    },
+                )
+                try:
+                    with urlopen(request, timeout=self.timeout) as response:
+                        xml_text = response.read().decode("utf-8")
+                    break
+                except HTTPError as exc:
+                    last_error = exc
+                    if exc.code not in {404, 429, 500, 502, 503, 504} or attempt == 2:
+                        break
+                except Exception as exc:
+                    last_error = exc
+                    if attempt == 2:
+                        break
+                time.sleep(1.0 * (attempt + 1))
+
+            if xml_text is None:
+                raise RuntimeError(
+                    f"YouTube RSS temporarily unavailable for channel {channel_id} after 3 attempts: {last_error}"
+                ) from last_error
+
             results.extend(parse_youtube_feed(xml_text, limit=50))
 
         normalized_query = query.strip().lower()
