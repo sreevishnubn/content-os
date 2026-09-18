@@ -187,3 +187,5 @@ The integration code is real, but external accounts and credentials still have t
 6. Never fabricate live data.
 7. Measure before changing the scoring system.
 8. Add infrastructure only when the business needs it.
+
+<!-- Vercel deployment trigger: 2026-09-18 -->
