@@ -74,10 +74,10 @@ body.light .card,body.light .idea-card,body.light .script-card,body.light .row-c
 .learning-stat strong{display:block;font-size:22px;margin-top:5px}
 .insight{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 14px;border-radius:8px;margin:8px 0}
 .status.good{color:var(--good)}.status.bad{color:var(--bad)}
-.theme-toggle{display:inline-flex;align-items:center;gap:8px}
+.theme-toggle{display:inline-flex;align-items:center;gap:8px}.side>.theme-toggle{width:calc(100% - 16px);margin:18px 8px;justify-content:center}
 @media(max-width:640px){
  .learning-summary{grid-template-columns:1fr}
- .theme-toggle{width:100%}
+ .side>.theme-toggle{position:fixed;right:10px;top:10px;width:auto;margin:0;z-index:30;padding:7px 10px} .theme-toggle{width:100%}
  #nav{display:flex;overflow-x:auto;gap:3px;height:48px;scrollbar-width:none}
  #nav::-webkit-scrollbar{display:none}
  #nav button{min-width:72px;flex:0 0 72px}
